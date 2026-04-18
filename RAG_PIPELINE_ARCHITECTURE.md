@@ -8,7 +8,7 @@
 
 ## Overview
 
-This document describes the Nutanix technical knowledge base RAG (Retrieval-Augmented Generation) pipeline. It is used by **Sam** (Ivan's primary assistant) and **NX_Shield** (external engineer-facing support agent) to answer Nutanix product, KB, and troubleshooting questions.
+This document describes the Nutanix technical knowledge base RAG (Retrieval-Augmented Generation) pipeline. It is used by **Sam** (Ivan's primary assistant) and **NX_Shield** (engineer-facing support agent) to answer Nutanix product, KB, and troubleshooting questions.
 
 ---
 
