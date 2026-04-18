@@ -19,9 +19,8 @@ This document describes the Nutanix technical knowledge base RAG (Retrieval-Augm
 ```
 DATA SOURCES
 |
-+-- portal.nutanix.com (CDP/Chrome scraping)
++-- portal.nutanix.com (CDP/Chrome)
 +-- nutanix.dev / developers.nutanix.com
-+-- Google Docs (Nutanix internal)
 +-- GitHub Nutanix repos
 +-- NCC docs, Files, Objects, Calm, Flow
 +-- Local PDFs (MarkItDown -> markdown)
