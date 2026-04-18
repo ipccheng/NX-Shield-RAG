@@ -121,11 +121,11 @@ format_results() -> LLM-readable output
 
 | Component | Host | IP | Notes |
 |---|---|---|---|
-| LanceDB + search | **Mac mini** | 100.118.251.87 (Tailscale) | Primary runtime |
-| Gemma 4 31B | **MacBook** | 100.74.228.94 (Tailscale) | Classification only |
+| LanceDB + search | **Mac mini** | Tailscale | Primary runtime |
+| Gemma 4 31B | **MacBook** | Tailscale | Classification only |
 | Jina Embed API | Cloud | api.jina.ai | Vectorization |
 | Jina Rerank API | Cloud | api.jina.ai | Semantic reranking |
-| OpenClaw gateway | **Mac mini** | 192.168.3.134:18789 | Agent orchestration |
+| OpenClaw gateway | **Mac mini** | LAN | Agent orchestration |
 
 ---
 
@@ -141,7 +141,7 @@ format_results() -> LLM-readable output
 
 #### `classify(query)` → `["TOPIC1", "TOPIC2"]`
 - **Type:** Query classification (Gemma 4 31B + keyword fallback)
-- **Endpoint:** `http://100.74.228.94:1234/v1/chat/completions` (MacBook via Tailscale)
+- **Endpoint:** `http://<macbook-tailscale>:1234/v1/chat/completions` (MacBook via Tailscale)
 - **Model:** `gemma4` (Q4_K_M, 19.89GB)
 - **Prompt:** "You are a Nutanix technical support classifier. Given the user query below, pick the 1-3 best matching topics from the list. Reply with ONLY topic names separated by commas, nothing else."
 - **Fallback:** If Gemma fails/times out, `QUERY_CLASSIFIERS` dict provides keyword-to-topic mapping (e.g. `"ncc health" → NCC_HEALTH`)
@@ -488,7 +488,7 @@ WHERE (lower(products) LIKE '%aos%' OR lower(products) LIKE '%volumes%') OR prod
 
 ```python
 DB_PATH = Path("~/.openclaw/memory/lancedb-pro").expanduser()
-GEMMA_URL = "http://100.74.228.94:1234/v1/chat/completions"  # MacBook Tailscale
+GEMMA_URL = "http://<macbook-tailscale>:1234/v1/chat/completions"  # MacBook Tailscale
 JINA_API_KEY = "<your-jina-api-key>"
 JINA_EMBED_URL = "https://api.jina.ai/v1/embeddings"
 JINA_RERANK_URL = "https://api.jina.ai/v1/rerank"
@@ -534,5 +534,5 @@ python3 nutanix_rag_search.py "NCC health check sysstats error" 3
 | 2026-04-18 | Critical bug fix: `_expanded_text` → `text` swap at return |
 | 2026-04-18 | Dead code removed: `expand_to_parent_window` (78 lines) |
 | 2026-04-18 | NX_Shield SOUL.md: Rule 5 — must cite sources |
-| 2026-04-18 | MacBook Gemma switched from 192.168.3.133 → 100.74.228.94 (Tailscale) |
+| 2026-04-18 | MacBook Gemma switched from MacBook → MacBook (Tailscale) |
 | 2026-04-18 | Stale rebuild directories deleted: ~509MB freed |
