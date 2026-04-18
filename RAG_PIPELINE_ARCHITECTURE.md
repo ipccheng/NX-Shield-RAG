@@ -59,17 +59,6 @@ v
 format_results() -> LLM-readable output
 ```
 
-### Data Sources
-
-| Source | Tool / Method | Content Type |
-|---|---|---|
-| portal.nutanix.com | CDP/Chrome (Playwright) | KB articles, docs |
-| nutanix.dev | Firecrawl crawl | API refs, guides |
-| Google Docs (Nutanix) | Browser automation | Internal enablement docs |
-| GitHub Nutanix repos | Download + chunk | Blueprints, YAML |
-| NCC health checks | Local docs | Health check output |
-| Local PDFs | MarkItDown | Datasheets, guides |
-
 ### LanceDB Table
 
 - **Path:** `~/.openclaw/memory/lancedb-pro/nutanix_rag_v2.lance`
