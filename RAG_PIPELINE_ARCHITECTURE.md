@@ -25,7 +25,6 @@ DATA SOURCES
 +-- GitHub Nutanix repos
 +-- NCC docs, Files, Objects, Calm, Flow
 +-- Local PDFs (MarkItDown -> markdown)
-+-- WhatsApp / Slack processed chats
 |
 v
 INGESTION PIPELINE
@@ -70,7 +69,6 @@ format_results() -> LLM-readable output
 | GitHub Nutanix repos | Download + chunk | Blueprints, YAML |
 | NCC health checks | Local docs | Health check output |
 | Local PDFs | MarkItDown | Datasheets, guides |
-| WhatsApp / Slack | File export + chunk | SE team conversations |
 
 ### LanceDB Table
 
