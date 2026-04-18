@@ -14,207 +14,106 @@ This document describes the Nutanix technical knowledge base RAG (Retrieval-Augm
 
 ## System Architecture
 
+### High-Level Flow
+
 ```
-+---------------------------------------------------------------------+
-|                          DATA SOURCES                               |
-|                                                                      |
-|   portal.nutanix.com     nutanix.dev        Google Docs (Nutanix)  |
-|   GitHub Nutanix repos   NCC docs           Local PDFs              |
-|   Files / Objects / Calm / Flow  WhatsApp & Slack processed chats  |
-+--------------------------------+-------------------------------------+
-                                    |
-                    embed_pipeline_v2.py
-                    selective_embed.py
-                    MarkItDown (PDF -> markdown)
-                                    |
-                                    v
-+---------------------------------------------------------------------+
-|                     LANCEDB TABLE                                   |
-|                                                                      |
-|   Path:     ~/.openclaw/memory/lancedb-pro/nutanix_rag_v2.lance   |
-|   Rows:     98,234                                                   |
-|   Size:     ~991 MB                                                  |
-|   Embedding: Jina AI (jina-embeddings-v5-text-small, 1024 dims)     |
-|   Indexes:  LanceDB vector index + BM25 FTS index                   |
-|                                                                      |
-|   Schema fields:                                                     |
-|   - text          (chunk content, ~8000 chars per chunk)           |
-|   - vector        (1024-dim float array)                           |
-|   - products      (JSON array, e.g. ["AOS", "AHV"])               |
-|   - subcategory    (e.g. "NCC_HEALTH", "STORAGE_FORMULA")         |
-|   - folder         (source folder path)                            |
-|   - source         (full URL or file path)                          |
-|   - kb_number      (e.g. "KB-000001557")                          |
-|   - content_type   (e.g. "admin-guide", "api-reference")           |
-|   - chunk_index    (position in source document)                    |
-|   - total_chunks  (total chunks in source document)                 |
-+--------------------------------+-------------------------------------+
-                                    |
-                    query_nutanix_docs (tool)
-                                    |
-                    +---------------+---------------+
-                    |                               |
-                    v                               v
-+-------------------------+               +-------------------------+
-|   Sam (main agent)     |               |   NX_Shield agent     |
-|   Direct Python import  |               |   MCP protocol         |
-|   run_search()         |               |   mcp_server.py        |
-+-------------------------+               +-------------------------+
-                    |                               |
-                    +---------------+---------------+
-                                    |
-                                    v
-+---------------------------------------------------------------------+
-|                     run_search() -- STAGE FLOW                       |
-|                                                                      |
-|   +-----------------------------------------------------------+    |
-|   |  STAGE 0: PARALLEL -- Gemma classify + Jina embed         |    |
-|   |  (ThreadPoolExecutor, max_workers=2, ~1s combined)         |    |
-|   +-----------------------------------------------------------+    |
-|                                    |                                |
-|                                    v                                |
-|   +-----------------------------------------------------------+    |
-|   |  STAGE 1: PARALLEL TOPIC SEARCHES (per matched topic)     |    |
-|   |  - Products pushdown filter (LanceDB SQL)                  |    |
-|   |  - Vector search (LanceDB, emb_topic)                      |    |
-|   |  - FTS search (LanceDB BM25, search_q)                    |    |
-|   |  - RRF merge (k=60, topic_weight per topic)                |    |
-|   |  Output: Top 50 candidates per topic                        |    |
-|   +-----------------------------------------------------------+    |
-|                                    |                                |
-|                                    v                                |
-|   +-----------------------------------------------------------+    |
-|   |  STAGE 2: CONTEXT EXPANSION (expand_for_rerank)            |    |
-|   |  Arrow-native +/-2 neighbor chunk merge per unique file      |    |
-|   |  Output: _expanded_text field (up to 32K chars per result)  |    |
-|   +-----------------------------------------------------------+    |
-|                                    |                                |
-|                                    v                                |
-|   +-----------------------------------------------------------+    |
-|   |  STAGE 3: CROSS-ENCODER RERANK (jina-reranker-v3)          |    |
-|   |  Jina AI hosted listwise reranker (0.6B params)             |    |
-|   |  Input: top 50 candidates with _expanded_text               |    |
-|   |  Output: reranked by CE score                              |    |
-|   +-----------------------------------------------------------+    |
-|                                    |                                |
-|                                    v                                |
-|   +-----------------------------------------------------------+    |
-|   |  STAGE 4: SCORE MULTIPLIER (score_multiplier)              |    |
-|   |  KB# exact match -> 2.0x  |  Subcategory -> 1.5x  |  Product -> 1.3x |    |
-|   |  Final score = CE_score x multiplier                         |    |
-|   +-----------------------------------------------------------+    |
-|                                    |                                |
-|                                    v                                |
-|   +-----------------------------------------------------------+    |
-|   |  STAGE 5: CONFIDENCE FILTER + TEXT SWAP                   |    |
-|   |  MIN_CE_SCORE=0.1 filter (CE~0 AND multiplier<=1 -> excluded)|    |
-|   |  _expanded_text -> text (SWAP for LLM readability)         |    |
-|   |  Output: Top 5 results                                     |    |
-|   +-----------------------------------------------------------+    |
-|                                    |                                |
-|                                    v                                |
-|   +-----------------------------------------------------------+    |
-|   |  format_results()                                          |    |
-|   |  Source URL + scores + text preview -> formatted string    |    |
-|   +-----------------------------------------------------------+    |
-+---------------------------------------------------------------------+
+DATA SOURCES
+|
++-- portal.nutanix.com (CDP/Chrome scraping)
++-- nutanix.dev / developers.nutanix.com
++-- Google Docs (Nutanix internal)
++-- GitHub Nutanix repos
++-- NCC docs, Files, Objects, Calm, Flow
++-- Local PDFs (MarkItDown -> markdown)
++-- WhatsApp / Slack processed chats
+|
+v
+INGESTION PIPELINE
+|
++-- embed_pipeline_v2.py (chunking + embedding)
++-- selective_embed.py (incremental updates)
++-- MarkItDown (PDF -> markdown)
+|
+v
+LANCEDB (~98K rows, ~991 MB)
+|
++-- Vector index (LanceDB)
++-- BM25 FTS index
+|
+v
+QUERY INTERFACE
+|
++-- Sam: direct Python import run_search()
++-- NX_Shield: MCP protocol via mcp_server.py
+|
+v
+run_search() [5-stage pipeline]
+|
++-- Stage 0: Parallel Gemma classify + Jina embed
++-- Stage 1: Parallel topic searches (vector + BM25 + RRF)
++-- Stage 2: Context expansion (neighbor chunks)
++-- Stage 3: Cross-encoder rerank (jina-reranker-v3)
++-- Stage 4: Score multiplier (KB / subcategory / product)
++-- Stage 5: Confidence filter + text swap
+|
+v
+format_results() -> LLM-readable output
 ```
-                                 |
-                    embed_pipeline_v2.py
-                    selective_embed.py
-                    MarkItDown (PDF → markdown)
-                                 |
-                                 v
-+---------------------------------------------------------------------+
-|                     LANCEDB TABLE                                   |
-|                                                                      |
-|   Path:     ~/.openclaw/memory/lancedb-pro/nutanix_rag_v2.lance   |
-|   Rows:     98,234                                                   |
-|   Size:     ~991 MB                                                  |
-|   Embedding: Jina AI (jina-embeddings-v5-text-small, 1024 dims)     |
-|   Indexes:  LanceDB vector index + BM25 FTS index                 |
-|                                                                      |
-|   Schema fields:                                                     |
-|   - text          (chunk content, ~8000 chars per chunk)           |
-|   - vector        (1024-dim float array)                           |
-|   - products      (JSON array, e.g. ["AOS", "AHV"])                |
-|   - subcategory    (e.g. "NCC_HEALTH", "STORAGE_FORMULA")          |
-|   - folder         (source folder path)                             |
-|   - source         (full URL or file path)                         |
-|   - kb_number      (e.g. "KB-000001557")                           |
-|   - content_type   (e.g. "admin-guide", "api-reference")           |
-|   - chunk_index    (position in source document)                    |
-|   - total_chunks  (total chunks in source document)                |
-+--------------------------------+------------------------------------+
-                                 |
-                    query_nutanix_docs (tool)
-                                 |
-          +-----------------------+-----------------------+
-          |                                               |
-          v                                               v
-+-------------------------+               +-------------------------+
-|   Sam (main agent)     |               |   NX_Shield agent     |
-|   Direct Python import  |               |   MCP protocol         |
-|   run_search()         |               |   mcp_server.py        |
-+-------------------------+               +-------------------------+
-          |                                               |
-          +-----------------------+-----------------------+
-                                  |
-                                  v
-+---------------------------------------------------------------------+
-|                     run_search() — STAGE FLOW                       |
-|                                                                      |
-|  +--------------------------------------------------------------+    |
-|  |  STAGE 0: PARALLEL — Gemma classify + Jina embed           |    |
-|  |  (ThreadPoolExecutor, max_workers=2, ~1s combined)         |    |
-|  +--------------------------------------------------------------+    |
-|                                  |                                   |
-|                                  v                                   |
-|  +--------------------------------------------------------------+    |
-|  |  STAGE 1: PARALLEL TOPIC SEARCHES (per matched topic)       |    |
-|  |  - Products pushdown filter (LanceDB SQL)                    |    |
-|  |  - Vector search (LanceDB, emb_topic)                       |    |
-|  |  - FTS search (LanceDB BM25, search_q)                      |    |
-|  |  - RRF merge (k=60, topic_weight per topic)                 |    |
-|  |  Output: Top 50 candidates per topic                         |    |
-|  +--------------------------------------------------------------+    |
-|                                  |                                   |
-|                                  v                                   |
-|  +--------------------------------------------------------------+    |
-|  |  STAGE 2: CONTEXT EXPANSION (expand_for_rerank)            |    |
-|  |  Arrow-native ±2 neighbor chunk merge per unique file        |    |
-|  |  Output: _expanded_text field (up to 32K chars per result) |    |
-|  +--------------------------------------------------------------+    |
-|                                  |                                   |
-|                                  v                                   |
-|  +--------------------------------------------------------------+    |
-|  |  STAGE 3: CROSS-ENCODER RERANK (jina-reranker-v3)          |    |
-|  |  Jina AI hosted listwise reranker (0.6B params)             |    |
-|  |  Input: top 50 candidates with _expanded_text                |    |
-|  |  Output: reranked by CE score                               |    |
-|  +--------------------------------------------------------------+    |
-|                                  |                                   |
-|                                  v                                   |
-|  +--------------------------------------------------------------+    |
-|  |  STAGE 4: SCORE MULTIPLIER (score_multiplier)               |    |
-|  |  KB# exact match → 2.0×  |  Subcategory → 1.5×  |  Product → 1.3×|    |
-|  |  Final score = CE_score × multiplier                         |    |
-|  +--------------------------------------------------------------+    |
-|                                  |                                   |
-|                                  v                                   |
-|  +--------------------------------------------------------------+    |
-|  |  STAGE 5: CONFIDENCE FILTER + TEXT SWAP                     |    |
-|  |  MIN_CE_SCORE=0.1 filter (CE≈0 AND multiplier≤1 → excluded)  |    |
-|  |  _expanded_text → text (SWAP for LLM readability)            |    |
-|  |  Output: Top 5 results                                      |    |
-|  +--------------------------------------------------------------+    |
-|                                  |                                   |
-|                                  v                                   |
-|  +--------------------------------------------------------------+    |
-|  |  format_results()                                           |    |
-|  |  Source URL + scores + text preview → formatted string       |    |
-|  +--------------------------------------------------------------+    |
-+---------------------------------------------------------------------+
+
+### Data Sources
+
+| Source | Tool / Method | Content Type |
+|---|---|---|
+| portal.nutanix.com | CDP/Chrome (Playwright) | KB articles, docs |
+| nutanix.dev | Firecrawl crawl | API refs, guides |
+| Google Docs (Nutanix) | Browser automation | Internal enablement docs |
+| GitHub Nutanix repos | Download + chunk | Blueprints, YAML |
+| NCC health checks | Local docs | Health check output |
+| Local PDFs | MarkItDown | Datasheets, guides |
+| WhatsApp / Slack | File export + chunk | SE team conversations |
+
+### LanceDB Table
+
+- **Path:** `~/.openclaw/memory/lancedb-pro/nutanix_rag_v2.lance`
+- **Rows:** 98,234
+- **Size:** ~991 MB
+- **Embedding:** Jina AI `jina-embeddings-v5-text-small` (1024 dims)
+- **Indexes:** LanceDB vector index + BM25 FTS index
+
+**Schema fields:**
+
+| Field | Type | Description |
+|---|---|---|
+| `text` | string | Chunk content, ~8000 chars per chunk |
+| `vector` | float[1024] | Jina embedding |
+| `products` | JSON array | e.g. `["AOS", "AHV"]` |
+| `subcategory` | string | e.g. `NCC_HEALTH`, `STORAGE_FORMULA` |
+| `folder` | string | Source folder path |
+| `source` | string | Full URL or file path |
+| `kb_number` | string | e.g. `KB-000001557` |
+| `content_type` | string | e.g. `admin-guide`, `api-reference` |
+| `chunk_index` | int | Position in source document |
+| `total_chunks` | int | Total chunks in source document |
+
+### Query Paths
+
+| Agent | Method | Tool Call |
+|---|---|---|
+| Sam (main) | Direct Python import | `run_search()` |
+| NX_Shield | MCP protocol | `mcp_server.py` -> `query_nutanix_docs` |
+
+### 5-Stage Run_Search Pipeline
+
+| Stage | Function | Input | Output | Duration |
+|---|---|---|---|---|
+| 0 | Parallel Gemma + Jina embed | query | topics + emb_topic | ~1s |
+| 1 | Per-topic LanceDB search | topics + emb_topic | top 50 candidates each | ~2-4s |
+| 2 | Context expansion | candidates | `_expanded_text` field | ~0.1s |
+| 3 | Jina reranker (CE) | `_expanded_text` | reranked list | ~2.3s |
+| 4 | Score multiplier | CE scores | boosted scores | ~0.01s |
+| 5 | Confidence filter + text swap | boosted scores | top 5 results | ~0.01s |
+
+**Total pipeline latency:** ~5-7s per query (warm)
 
 ---
 
