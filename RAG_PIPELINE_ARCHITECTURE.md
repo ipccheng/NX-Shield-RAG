@@ -1,4 +1,4 @@
-# Nutanix RAG Pipeline — Architecture & Documentation
+# NX_Shield RAG Pipeline — Architecture & Documentation
 
 > **Last updated:** 2026-04-18
 > **Author:** Sam (OpenClaw agent for Ivan)
