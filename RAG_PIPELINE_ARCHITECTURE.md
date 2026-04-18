@@ -125,22 +125,22 @@ format_results() -> LLM-readable output
 
 **Tools:**
 
-#### `classify(query)` → `["TOPIC1", "TOPIC2"]`
-- **Type:** Query classification (Gemma 4 31B + keyword fallback)
-- **Endpoint:** `http://<macbook-tailscale>:1234/v1/chat/completions` (MacBook via Tailscale)
-- **Model:** `gemma4` (Q4_K_M, 19.89GB)
-- **Prompt:** "You are a Nutanix technical support classifier. Given the user query below, pick the 1-3 best matching topics from the list. Reply with ONLY topic names separated by commas, nothing else."
-- **Fallback:** If Gemma fails/times out, `QUERY_CLASSIFIERS` dict provides keyword-to-topic mapping (e.g. `"ncc health" → NCC_HEALTH`)
-- **Valid topics:** `NETWORKING`, `AHV_NETWORK`, `NCC_HEALTH`, `FLOW_SECURITY`, `FLOW_QUARANTINE`, `STORAGE_FORMULA`, `ERASURE_CODING`, `LCM_FIRMWARE`, `GPU_VGPU`, `STRETCH_CLUSTER`, `DATA_PROTECTION`, `CALM_BLUEPRINT`, `NDB_DATABASE`, `HARDWARE_SPEC`, etc.
-- **Output:** `["NCC_HEALTH"]` or `["FLOW_SECURITY", "FLOW_QUARANTINE"]`
+- **`classify(query)` → `["TOPIC1", "TOPIC2"]`**
+  - **Type:** Query classification (Gemma 4 31B + keyword fallback)
+  - **Endpoint:** `http://<macbook-tailscale>:1234/v1/chat/completions` (MacBook via Tailscale)
+  - **Model:** `gemma4` (Q4_K_M, 19.89GB)
+  - **Prompt:** "You are a Nutanix technical support classifier. Given the user query below, pick the 1-3 best matching topics from the list. Reply with ONLY topic names separated by commas, nothing else."
+  - **Fallback:** If Gemma fails/times out, `QUERY_CLASSIFIERS` dict provides keyword-to-topic mapping (e.g. `"ncc health" → NCC_HEALTH`)
+  - **Valid topics:** `NETWORKING`, `AHV_NETWORK`, `NCC_HEALTH`, `FLOW_SECURITY`, `FLOW_QUARANTINE`, `STORAGE_FORMULA`, `ERASURE_CODING`, `LCM_FIRMWARE`, `GPU_VGPU`, `STRETCH_CLUSTER`, `DATA_PROTECTION`, `CALM_BLUEPRINT`, `NDB_DATABASE`, `HARDWARE_SPEC`, etc.
+  - **Output:** `["NCC_HEALTH"]` or `["FLOW_SECURITY", "FLOW_QUARANTINE"]`
 
-#### `jina_embed(query)` → `[0.0123, -0.0456, ...]` (1024 floats)
-- **Type:** Text vectorization
-- **Endpoint:** `https://api.jina.ai/v1/embeddings`
-- **Model:** `jina-embeddings-v5-text-small` (1024 dimensions)
-- **API key:** Stored in `nutanix_rag_search.py` (Jina key)
-- **Timeout:** 10s
-- **Output:** 1024-dimensional float vector
+- **`jina_embed(query)` → `[0.0123, -0.0456, ...]` (1024 floats)**
+  - **Type:** Text vectorization
+  - **Endpoint:** `https://api.jina.ai/v1/embeddings`
+  - **Model:** `jina-embeddings-v5-text-small` (1024 dimensions)
+  - **API key:** Stored in `nutanix_rag_search.py` (Jina key)
+  - **Timeout:** 10s
+  - **Output:** 1024-dimensional float vector
 
 **Example input/output:**
 ```
