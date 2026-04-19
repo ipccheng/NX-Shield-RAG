@@ -208,16 +208,6 @@ Atomic full rebuild:
 
 ---
 
-## Files to Skip
-
-These files are explicitly excluded from ingestion:
-
-| File | Reason |
-|---|---|
-| `slack/tc_nkp_kubernetes.txt` | User requested skip (35 records already embedded) |
-| `slack/tc_calm_error.txt` | User requested skip (27 records already embedded) |
-| `non_advisory_backup.json` | Pre-existing LanceDB export, not a real source doc (96K noise records) |
-
 ---
 
 ## Usage
