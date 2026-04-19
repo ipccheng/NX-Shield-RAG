@@ -1,4 +1,4 @@
-# NX_Shield RAG Pipeline — Embed Pipeline v2
+# NX_Shield RAG Embedding Pipeline — Documentation
 
 > **Last updated:** 2026-04-19
 > **Author:** Sam (OpenClaw agent for Ivan)
