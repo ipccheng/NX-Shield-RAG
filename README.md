@@ -6,7 +6,7 @@ A Retrieval-Augmented Generation (RAG) knowledge base for Nutanix technical supp
 
 ## Architecture
 
-![NX_Shield RAG Pipeline Architecture](./RAG_Pipeline_Diagram.png)
+![NX_Shield RAG Pipeline Architecture](https://github.com/ipccheng/rag-pipeline/blob/main/RAG%20Pipeline%20Diagram.png)
 
 ---
 
