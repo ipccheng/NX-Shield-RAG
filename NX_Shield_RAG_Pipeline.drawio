@@ -1,0 +1,364 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="NX_Shield RAG Pipeline" updated="2026-04-19T10:10:00.000Z">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1200" math="0" shadow="1">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ========== LAYER 1: Data Preparation (Orange) ========== -->
+        <mxCell id="L1_BG" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#FF9800;strokeWidth=3;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fontColor=#E65100;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="520" height="1100" as="geometry" />
+        </mxCell>
+        <mxCell id="L1_TITLE" value="Data Preparation Layer (Offline)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#E65100" vertex="1" parent="1">
+          <mxGeometry x="55" y="50" width="300" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- Data Sources -->
+        <mxCell id="DS_BG" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#666666;strokeWidth=1;shadow=1;verticalAlign=top;align=center;spacing=8" vertex="1" parent="1">
+          <mxGeometry x="120" y="100" width="360" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="DS_ICON" value="&#128230;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=28" vertex="1" parent="1">
+          <mxGeometry x="130" y="108" width="40" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="DS_TITLE" value="Data Sources" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1;fontColor=#333333" vertex="1" parent="1">
+          <mxGeometry x="180" y="108" width="200" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="DS_SUB" value="PDF  •  HTML  •  Markdown  •  TXT  •  GitHub  •  Google Docs" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#777777" vertex="1" parent="1">
+          <mxGeometry x="180" y="132" width="290" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow down -->
+        <mxCell id="A1" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#FF9800" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="300" y="185" as="sourcePoint" />
+            <mxPoint x="300" y="220" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Smart Chunking -->
+        <mxCell id="SC_BG" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#666666;strokeWidth=1;shadow=1;verticalAlign=top;align=center;spacing=8" vertex="1" parent="1">
+          <mxGeometry x="120" y="225" width="360" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="SC_ICON" value="&#128203;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=28" vertex="1" parent="1">
+          <mxGeometry x="130" y="233" width="40" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="SC_TITLE" value="Smart Chunking" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1;fontColor=#333333" vertex="1" parent="1">
+          <mxGeometry x="180" y="233" width="200" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="SC_SUB" value="1024 tokens / chunk  •  100 token overlap  •  Header-aware" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#777777" vertex="1" parent="1">
+          <mxGeometry x="180" y="257" width="290" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow down -->
+        <mxCell id="A2" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#FF9800" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="300" y="310" as="sourcePoint" />
+            <mxPoint x="300" y="345" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Doc Embedding -->
+        <mxCell id="DE_BG" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#666666;strokeWidth=1;shadow=1;verticalAlign=top;align=center;spacing=8" vertex="1" parent="1">
+          <mxGeometry x="120" y="350" width="360" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="DE_ICON" value="&#128640;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=28" vertex="1" parent="1">
+          <mxGeometry x="130" y="358" width="40" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="DE_TITLE" value="Doc Embedding" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1;fontColor=#333333" vertex="1" parent="1">
+          <mxGeometry x="180" y="358" width="200" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="DE_SUB" value="Jina AI  •  jina-embeddings-v5-text-small  •  1024 dims" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#777777" vertex="1" parent="1">
+          <mxGeometry x="180" y="382" width="290" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow down -->
+        <mxCell id="A3" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#FF9800" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="300" y="435" as="sourcePoint" />
+            <mxPoint x="300" y="470" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- LanceDB Vector Store -->
+        <mxCell id="VS_BG" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;strokeWidth=1;shadow=1;verticalAlign=top;align=center;spacing=8" vertex="1" parent="1">
+          <mxGeometry x="120" y="475" width="360" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="VS_ICON" value="&#128451;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=32" vertex="1" parent="1">
+          <mxGeometry x="130" y="490" width="40" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="VS_TITLE" value="LanceDB Vector Store" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1;fontColor=#1565C0" vertex="1" parent="1">
+          <mxGeometry x="180" y="488" width="220" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="VS_SUB1" value="98,234 chunks  •  ~991 MB  •  HNSW vector index" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#555555" vertex="1" parent="1">
+          <mxGeometry x="180" y="512" width="290" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="VS_SUB2" value="BM25 FTS index  •  Scalar indices (products, subcategory, folder)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#555555" vertex="1" parent="1">
+          <mxGeometry x="180" y="530" width="290" height="18" as="geometry" />
+        </mxCell>
+
+
+        <!-- ========== LAYER 2: Query Processing (Green) ========== -->
+        <mxCell id="L2_BG" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#4CAF50;strokeWidth=3;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fontColor=#2E7D32;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="600" y="40" width="520" height="1100" as="geometry" />
+        </mxCell>
+        <mxCell id="L2_TITLE" value="Query Processing Layer (Real-time)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#2E7D32" vertex="1" parent="1">
+          <mxGeometry x="615" y="50" width="350" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- Query Input -->
+        <mxCell id="QI_BG" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#666666;strokeWidth=1;shadow=1;verticalAlign=top;align=center;spacing=8" vertex="1" parent="1">
+          <mxGeometry x="680" y="100" width="360" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="QI_ICON" value="&#128172;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=26" vertex="1" parent="1">
+          <mxGeometry x="690" y="108" width="40" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="QI_TITLE" value="Query Input" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1;fontColor=#333333" vertex="1" parent="1">
+          <mxGeometry x="740" y="108" width="200" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="QI_SUB" value="User question (e.g. NCC health check sysstats error)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#777777" vertex="1" parent="1">
+          <mxGeometry x="740" y="132" width="290" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow down -->
+        <mxCell id="A4" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#4CAF50" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="860" y="175" as="sourcePoint" />
+            <mxPoint x="860" y="210" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Stage 0: Parallel Gemma + Embed -->
+        <mxCell id="S0_BG" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#666666;strokeWidth=1;shadow=1;verticalAlign=top;align=center;spacing=8" vertex="1" parent="1">
+          <mxGeometry x="680" y="215" width="360" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="S0_ICON" value="&#9889;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=26" vertex="1" parent="1">
+          <mxGeometry x="690" y="223" width="40" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="S0_TITLE" value="Stage 0 — Parallel Classify + Embed" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1;fontColor=#333333" vertex="1" parent="1">
+          <mxGeometry x="740" y="223" width="280" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="S0_SUB" value="Gemma 4 31B (topic) + Jina embed (vector) — parallel ~1s" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#777777" vertex="1" parent="1">
+          <mxGeometry x="740" y="247" width="290" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow down -->
+        <mxCell id="A5" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#4CAF50" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="860" y="300" as="sourcePoint" />
+            <mxPoint x="860" y="335" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Stage 1: Retriever -->
+        <mxCell id="S1_BG" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#666666;strokeWidth=1;shadow=1;verticalAlign=top;align=center;spacing=8" vertex="1" parent="1">
+          <mxGeometry x="680" y="340" width="360" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="S1_ICON" value="&#128269;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=26" vertex="1" parent="1">
+          <mxGeometry x="690" y="348" width="40" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="S1_TITLE" value="Stage 1 — Hybrid Search (Retriever)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1;fontColor=#333333" vertex="1" parent="1">
+          <mxGeometry x="740" y="348" width="280" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="S1_SUB" value="Vector search + BM25 FTS + RRF merge — top 50 per topic" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#777777" vertex="1" parent="1">
+          <mxGeometry x="740" y="372" width="290" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow down -->
+        <mxCell id="A6" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#4CAF50" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="860" y="425" as="sourcePoint" />
+            <mxPoint x="860" y="460" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Stage 2: Context Expander -->
+        <mxCell id="S2_BG" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#666666;strokeWidth=1;shadow=1;verticalAlign=top;align=center;spacing=8" vertex="1" parent="1">
+          <mxGeometry x="680" y="465" width="360" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="S2_ICON" value="&#10133;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=26" vertex="1" parent="1">
+          <mxGeometry x="690" y="473" width="40" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="S2_TITLE" value="Stage 2 — Context Expansion" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1;fontColor=#333333" vertex="1" parent="1">
+          <mxGeometry x="740" y="473" width="280" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="S2_SUB" value="Merge neighbour chunks ±2 per unique file — up to 32K chars" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#777777" vertex="1" parent="1">
+          <mxGeometry x="740" y="497" width="290" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow down -->
+        <mxCell id="A7" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#4CAF50" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="860" y="550" as="sourcePoint" />
+            <mxPoint x="860" y="585" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Stage 3: Cross-Encoder Reranker -->
+        <mxCell id="S3_BG" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#F57C00;strokeWidth=2;shadow=1;verticalAlign=top;align=center;spacing=8" vertex="1" parent="1">
+          <mxGeometry x="680" y="590" width="360" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="S3_ICON" value="&#127942;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=26" vertex="1" parent="1">
+          <mxGeometry x="690" y="598" width="40" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="S3_TITLE" value="Stage 3 — Cross-Encoder Reranker" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1;fontColor=#E65100;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="740" y="598" width="280" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="S3_SUB" value="jina-reranker-v3 (Jina AI) — listwise CE reranking" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#777777" vertex="1" parent="1">
+          <mxGeometry x="740" y="622" width="290" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow down -->
+        <mxCell id="A8" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#4CAF50" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="860" y="675" as="sourcePoint" />
+            <mxPoint x="860" y="710" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Stage 4: Score Multiplier -->
+        <mxCell id="S4_BG" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#666666;strokeWidth=1;shadow=1;verticalAlign=top;align=center;spacing=8" vertex="1" parent="1">
+          <mxGeometry x="680" y="715" width="360" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="S4_ICON" value="&#128200;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=26" vertex="1" parent="1">
+          <mxGeometry x="690" y="723" width="40" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="S4_TITLE" value="Stage 4 — Score Multiplier" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1;fontColor=#333333" vertex="1" parent="1">
+          <mxGeometry x="740" y="723" width="280" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="S4_SUB" value="KB# match ×2.0  •  Subcategory ×1.5  •  Product ×1.3" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#777777" vertex="1" parent="1">
+          <mxGeometry x="740" y="747" width="290" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow down -->
+        <mxCell id="A9" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#4CAF50" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="860" y="800" as="sourcePoint" />
+            <mxPoint x="860" y="835" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Stage 5: Confidence Filter + Response -->
+        <mxCell id="S5_BG" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#666666;strokeWidth=1;shadow=1;verticalAlign=top;align=center;spacing=8" vertex="1" parent="1">
+          <mxGeometry x="680" y="840" width="360" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="S5_ICON" value="&#10004;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=26" vertex="1" parent="1">
+          <mxGeometry x="690" y="848" width="40" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="S5_TITLE" value="Stage 5 — Confidence Filter + Response" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1;fontColor=#333333" vertex="1" parent="1">
+          <mxGeometry x="740" y="848" width="280" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="S5_SUB" value="Min CE score 0.1 filter  •  Top 5 results  •  Source citations" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#777777" vertex="1" parent="1">
+          <mxGeometry x="740" y="872" width="290" height="20" as="geometry" />
+        </mxCell>
+
+
+        <!-- ========== LAYER 3: User (Orange) ========== -->
+        <mxCell id="L3_BG" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#FF9800;strokeWidth=3;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fontColor=#E65100;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1160" y="40" width="440" height="1100" as="geometry" />
+        </mxCell>
+        <mxCell id="L3_TITLE" value="User Layer" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#E65100" vertex="1" parent="1">
+          <mxGeometry x="1175" y="50" width="200" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- START oval -->
+        <mxCell id="START" value="START" style="ellipse;whiteSpace=wrap;html=1;fillColor=#4CAF50;fontColor=#FFFFFF;fontSize=13;fontStyle=1;strokeColor=#2E7D32" vertex="1" parent="1">
+          <mxGeometry x="1320" y="110" width="100" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow down -->
+        <mxCell id="A10" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#FF9800" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1370" y="165" as="sourcePoint" />
+            <mxPoint x="1370" y="205" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- User Question -->
+        <mxCell id="UQ_BG" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#666666;strokeWidth=1;shadow=1;verticalAlign=top;align=center;spacing=8" vertex="1" parent="1">
+          <mxGeometry x="1200" y="210" width="340" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="UQ_ICON" value="&#128100;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=26" vertex="1" parent="1">
+          <mxGeometry x="1210" y="218" width="40" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="UQ_TITLE" value="User Question" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1;fontColor=#333333" vertex="1" parent="1">
+          <mxGeometry x="1260" y="218" width="200" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="UQ_SUB" value="Ivan or external engineer via NX_Shield Discord bot" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#777777" vertex="1" parent="1">
+          <mxGeometry x="1260" y="242" width="270" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow down to Response Output -->
+        <mxCell id="A11" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#FF9800" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1370" y="975" as="sourcePoint" />
+            <mxPoint x="1370" y="1015" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Response Output -->
+        <mxCell id="RO_BG" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#666666;strokeWidth=1;shadow=1;verticalAlign=top;align=center;spacing=8" vertex="1" parent="1">
+          <mxGeometry x="1200" y="1020" width="340" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="RO_ICON" value="&#128172;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=26" vertex="1" parent="1">
+          <mxGeometry x="1210" y="1028" width="40" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="RO_TITLE" value="Response Output" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1;fontColor=#333333" vertex="1" parent="1">
+          <mxGeometry x="1260" y="1028" width="200" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="RO_SUB" value="Answer with source citations — Discord / Sam chat" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#777777" vertex="1" parent="1">
+          <mxGeometry x="1260" y="1052" width="270" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow down -->
+        <mxCell id="A12" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#FF9800" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1370" y="1095" as="sourcePoint" />
+            <mxPoint x="1370" y="1125" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- END oval -->
+        <mxCell id="END" value="END" style="ellipse;whiteSpace=wrap;html=1;fillColor=#F44336;fontColor=#FFFFFF;fontSize=13;fontStyle=1;strokeColor=#C62828" vertex="1" parent="1">
+          <mxGeometry x="1320" y="1130" width="100" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ========== CROSS-LAYER ARROWS ========== -->
+        <!-- User Question -> Query Input -->
+        <mxCell id="CA1" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#E65100;dashed=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1195" y="245" as="sourcePoint" />
+            <mxPoint x="1045" y="245" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Formatted Response -> Response Output -->
+        <mxCell id="CA2" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#E65100;dashed=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1045" y="880" as="sourcePoint" />
+            <mxPoint x="1195" y="1055" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Retriever -> LanceDB (dotted retrieval line) -->
+        <mxCell id="CA3" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#1565C0;dashed=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="675" y="380" as="sourcePoint" />
+            <mxPoint x="485" y="525" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Labels for cross arrows -->
+        <mxCell id="LBL1" value="Query" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#E65100;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="1100" y="230" width="60" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="LBL2" value="Response" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#E65100;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="1100" y="1035" width="60" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="LBL3" value="Vector search" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#1565C0;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="545" y="440" width="80" height="20" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
