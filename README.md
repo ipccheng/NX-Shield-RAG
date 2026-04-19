@@ -49,5 +49,4 @@ Ingestion pipeline documentation — covers smart chunking, metadata extraction 
 | `README.md` | This file |
 | `RAG_PIPELINE_ARCHITECTURE.md` | Query pipeline full documentation |
 | `EMBED_PIPELINE.md` | Ingestion pipeline full documentation |
-| `NX_Shield_RAG_Pipeline.drawio` | Editable draw.io diagram source |
 | `RAG_Pipeline_Diagram.png` | Architecture diagram (exported from draw.io) |
