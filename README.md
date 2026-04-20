@@ -12,14 +12,14 @@ A Retrieval-Augmented Generation (RAG) knowledge base for Nutanix technical supp
 
 ## Documents
 
-### [RAG_PIPELINE_ARCHITECTURE.md](./RAG_PIPELINE_ARCHITECTURE.md)
+### 👉 1. [RAG_PIPELINE_ARCHITECTURE.md](./RAG_PIPELINE_ARCHITECTURE.md)
 Full pipeline documentation — covers the 5-stage query processing flow, LanceDB schema, classification system, products pushdown filter, reranking, score multipliers, confidence thresholds, and MCP server integration.
 
 **Best for:** Understanding how a query moves from user input to formatted response.
 
 ---
 
-### [EMBED_PIPELINE.md](./EMBED_PIPELINE.md)
+### 👉 2. [EMBED_PIPELINE.md](./EMBED_PIPELINE.md)
 Ingestion pipeline documentation — covers smart chunking, metadata extraction (20 products, 8 content types), Jina AI embedding, LanceDB storage, checkpoint system, and the atomic rebuild process.
 
 **Best for:** Understanding how source documents are processed, chunked, and loaded into the vector database.
