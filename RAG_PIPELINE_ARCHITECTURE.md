@@ -1,6 +1,6 @@
 # NX_Shield RAG Pipeline — Architecture & Documentation
 
-> **Last updated:** 2026-04-18
+> **Last updated:** 2026-04-26
 > **Author:** Sam (OpenClaw agent for Ivan)
 > **Status:** Active — Mac mini as primary runtime, MacBook providing Gemma via Tailscale
 
@@ -45,14 +45,15 @@ QUERY INTERFACE
 +-- NX_Shield: MCP protocol via mcp_server.py
 |
 v
-run_search() [5-stage pipeline]
+run_search() [7-stage pipeline]
 |
-+-- Stage 0: Parallel Gemma classify + Jina embed
-+-- Stage 1: Parallel topic searches (vector + BM25 + RRF)
-+-- Stage 2: Context expansion (neighbor chunks)
-+-- Stage 3: Cross-encoder rerank (jina-reranker-v3)
-+-- Stage 4: Score multiplier (KB / subcategory / product)
-+-- Stage 5: Confidence filter + text swap
++-- Stage 1: Gemma classification (MacBook Gemma via Tailscale, 3s timeout)
++-- Stage 2: Jina embed (api.jina.ai, 1024-dim)
++-- Stage 3: LanceDB hybrid search (vector + FTS + RRF)
++-- Stage 4: expand_for_rerank (±2 neighbor context via PyArrow)
++-- Stage 5: Jina cross-encoder rerank (top 30 → top 5)
++-- Stage 6: score_multiplier() + confidence filter
++-- Stage 7: format_results() -> LLM-readable output
 |
 v
 format_results() -> LLM-readable output
@@ -61,8 +62,8 @@ format_results() -> LLM-readable output
 ### LanceDB Table
 
 - **Path:** `~/.openclaw/memory/lancedb-pro/nutanix_rag_v2.lance`
-- **Rows:** 98,234
-- **Size:** ~991 MB
+- **Rows:** 170,708
+- **Size:** ~1.2 GB
 - **Embedding:** Jina AI `jina-embeddings-v5-text-small` (1024 dims)
 - **Indexes:** LanceDB vector index + BM25 FTS index
 
@@ -92,14 +93,15 @@ format_results() -> LLM-readable output
 
 | Stage | Function | Input | Output | Duration |
 |---|---|---|---|---|
-| 0 | Parallel Gemma + Jina embed | query | topics + emb_topic | ~1s |
-| 1 | Per-topic LanceDB search | topics + emb_topic | top 50 candidates each | ~2-4s |
-| 2 | Context expansion | candidates | `_expanded_text` field | ~0.1s |
-| 3 | Jina reranker (CE) | `_expanded_text` | reranked list | ~2.3s |
-| 4 | Score multiplier | CE scores | boosted scores | ~0.01s |
-| 5 | Confidence filter + text swap | boosted scores | top 5 results | ~0.01s |
+| 1 | Gemma classification | query | topics | ~1s |
+| 2 | Jina embed | query | emb_topic (1024-dim) | ~1s |
+| 3 | LanceDB hybrid search | topics + emb_topic | top 30 candidates | ~0.5s |
+| 4 | expand_for_rerank | candidates | `_expanded_text` (~24K chars) | **3-4s** |
+| 5 | Jina CE rerank | `_expanded_text` | reranked top 5 | ~1s |
+| 6 | Score multiplier + confidence filter | CE scores | boosted scores | ~0.01s |
+| 7 | format_results() | boosted scores | formatted output | ~0.01s |
 
-**Total pipeline latency:** ~5-7s per query (warm)
+**Total pipeline latency:** ~6-8s per query (warm) — down from ~60s after expand_for_rerank fix
 
 ---
 
@@ -244,6 +246,8 @@ r["_expanded_text"] = merged_text
 
 **Window:** ±2 chunks per side (configurable via `window=2`)
 
+**⚠️ CRITICAL FIX (2026-04-26):** The original `.to_pandas()` approach deadlocked on LanceDB 0.27 (Python 3.9) due to PyArrow schema issues. Replaced with direct PyArrow column iteration — bypasses LanceDB's Pandas export entirely, reducing expand time from **54s → 3-4s** (**9× faster**).
+
 **Memory approach:** Uses PyArrow `filter()` (columnar, memory-mapped) — does NOT re-run vector search. Reads existing data from disk.
 
 **Output:** Results list with `_expanded_text` field added (up to 32,000 chars per result)
@@ -251,7 +255,7 @@ r["_expanded_text"] = merged_text
 **Example:**
 ```
 Original chunk (chunk 5): "...sysstats error on node..."
-_expanded_text: "...NCC sysstats collection...sysstats error on node...node reboot required..." 
+_expanded_text: "...NCC sysstats collection...sysstats error on node...node reboot required..."
                  (chunks 3, 4, 5, 6, 7 merged)
 ```
 
@@ -278,7 +282,7 @@ curl -X POST https://api.jina.ai/v1/rerank \
   -d '{"model": "jina-reranker-v3", "query": query, "documents": docs, "top_n": 30}'
 ```
 
-**Input:** `_expanded_text` of each of the top 50 candidates (up to 32K chars each)
+**Input:** `_expanded_text` of each of the top 30 candidates (up to 32K chars each)
 
 **Output:** Reranked list with `rerank_score` (CE relevance score, typically -1 to +1)
 
@@ -474,13 +478,13 @@ WHERE (lower(products) LIKE '%aos%' OR lower(products) LIKE '%volumes%') OR prod
 
 ```python
 DB_PATH = Path("~/.openclaw/memory/lancedb-pro").expanduser()
-GEMMA_URL = "http://<macbook-tailscale>:1234/v1/chat/completions"  # MacBook Tailscale
+GEMMA_URL = "http://100.74.228.94:1234/v1/chat/completions"  # MacBook via Tailscale
 JINA_API_KEY = "<your-jina-api-key>"
 JINA_EMBED_URL = "https://api.jina.ai/v1/embeddings"
 JINA_RERANK_URL = "https://api.jina.ai/v1/rerank"
-GEMMA_TIMEOUT = 10  # seconds
+GEMMA_TIMEOUT = 3   # seconds (fail-fast to keyword fallback)
 fetch_n = 100       # LanceDB rows fetched per topic
-rerank_top = 50     # candidates sent to CE reranker
+rerank_top = 30     # candidates sent to CE reranker (30 → 5)
 limit = 5           # final results returned
 ```
 
@@ -493,7 +497,7 @@ limit = 5           # final results returned
 Topics: ['NCC_HEALTH']
 Query: NCC health check sysstats error
 
-  [124] unique, reranking top 50...
+  [124] unique, reranking top 30...
   [1A] Expanding to ±2 neighbor context...
   [1B] Excluded 0 blueprint chunks (non-Calm topic)
 ```
@@ -511,6 +515,16 @@ python3 nutanix_rag_search.py "NCC health check sysstats error" 3
 
 | Date | Change |
 |---|---|
+| 2026-04-26 | **expand_for_rerank fix:** `.to_pandas()` deadlock → PyArrow column iteration → 54s → 3-4s (**9× faster**) |
+| 2026-04-26 | **GEMMA_TIMEOUT:** 10s → **3s** (fail-fast to keyword fallback) |
+| 2026-04-26 | **Jina curl --max-time 15:** added to all Jina API calls |
+| 2026-04-26 | **mcp_server.py:** `parse_known_args()` for MCP safety |
+| 2026-04-26 | **rerank_top:** pipeline sends top 30 → returns top 5 (was 50→5) |
+| 2026-04-26 | **DB rows:** 98,234 → **170,708** (MacBook/Mac mini sync) |
+| 2026-04-26 | **memory-lancedb-pro:** removed from plugins.entries (using hindsight-openclaw) |
+| 2026-04-26 | **fullqualitypath MCP:** removed — only `nutanix-rag-search-fastpath` remains |
+| 2026-04-26 | **NX_Shield SOUL.md:** Max 2 RAG calls + synthesize-and-stop rule |
+| 2026-04-26 | **Pipeline latency:** ~60s → **~6-8s** per query |
 | 2026-04-17 | Products pushdown filter implemented |
 | 2026-04-17 | Metadata fix pass: 24,910 rows updated (26.5% → 0.4% empty products) |
 | 2026-04-17 | Gemini 4 31B semantic routing (MacBook via Tailscale) |
