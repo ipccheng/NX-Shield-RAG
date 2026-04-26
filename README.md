@@ -13,7 +13,7 @@ A Retrieval-Augmented Generation (RAG) knowledge base for Nutanix technical supp
 ## Documents
 
 ### 👉 1. [RAG_PIPELINE_ARCHITECTURE.md](./RAG_PIPELINE_ARCHITECTURE.md)
-Full pipeline documentation — covers the 5-stage query processing flow, LanceDB schema, classification system, products pushdown filter, reranking, score multipliers, confidence thresholds, and MCP server integration.
+Full pipeline documentation — covers the 7-stage query processing flow, LanceDB schema, classification system, products pushdown filter, reranking, score multipliers, confidence thresholds, MCP server integration, and runtime infrastructure.
 
 **Best for:** Understanding how a query moves from user input to formatted response.
 
@@ -32,12 +32,13 @@ Ingestion pipeline documentation — covers smart chunking, metadata extraction 
 |---|---|
 | Vector DB | LanceDB (`~/.openclaw/memory/lancedb-pro/`) |
 | Embedding | Jina AI `jina-embeddings-v5-text-small` (1024 dims) |
-| Classifier | Gemma 4 31B (via MacBook Tailscale) |
-| Reranker | jina-reranker-v3 (Jina AI, listwise) |
+| Classifier | Gemma 4 31B (via MacBook Tailscale, 3s timeout) |
+| Reranker | jina-reranker-v3 (Jina AI, listwise, top 30→5) |
 | Index | HNSW vector + BM25 FTS + scalar (products, subcategory, folder) |
 | Chunk size | 1024 tokens / 100 token overlap |
-| DB size | ~98K chunks / ~991 MB |
-| Query latency | ~5–7s (warm) |
+| DB size | **170,708 chunks** / ~1.2 GB |
+| Query latency | ~6–8s (warm) |
+| Pipeline | 7-stage: classify → embed → LanceDB search → expand → rerank → score → format |
 | Agents | Sam (main), NX_Shield (Discord bot) |
 
 ---
