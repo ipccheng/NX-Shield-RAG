@@ -478,7 +478,7 @@ WHERE (lower(products) LIKE '%aos%' OR lower(products) LIKE '%volumes%') OR prod
 
 ```python
 DB_PATH = Path("~/.openclaw/memory/lancedb-pro").expanduser()
-GEMMA_URL = "http://100.74.228.94:1234/v1/chat/completions"  # MacBook via Tailscale
+GEMMA_URL = "http://<macbook-tailscale>:1234/v1/chat/completions"  # MacBook via Tailscale
 JINA_API_KEY = "<your-jina-api-key>"
 JINA_EMBED_URL = "https://api.jina.ai/v1/embeddings"
 JINA_RERANK_URL = "https://api.jina.ai/v1/rerank"
