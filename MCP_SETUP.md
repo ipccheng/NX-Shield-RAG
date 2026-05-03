@@ -7,27 +7,31 @@ Two MCP servers run as system daemons on Mac mini, serving Nutanix RAG search to
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│  OpenClaw Gateway                                                   │
-│                                                                     │
-│  Sam (agent:main) ──── rag-mcp-server-sam ──────────┐              │
-│                                                       │              │
-│  NX_Shield (agent:nutanix_shield) ── rag-mcp-server ─┼─────┐        │
-│                                                       │     │        │
-└───────────────────────────────────────────────────────┘     │        │
-                                                                ▼        │
-┌───────────────────────────────────────────────────────────────────┐ │
-│  MCP Server Python process (per-agent)                              │ │
-│  ├── mcp_server.py --rerank-top 30 --port 8004      (Sam)           │ │
-│  └── mcp_server.py --rerank-top 30 --port 8001      (NX_Shield)     │ │
-│       --identity nx_shield                                          │ │
-└───────────────────────────────────────────────────────────────────┘ │
-                              │                                        │
-                              ▼                                        │
-┌───────────────────────────────────────────────────────────────────┐ │
-│  LanceDB  ~/.openclaw/memory/lancedb-pro/nutanix_rag_v3.lance       │ │
-│  ~1.2GB, ~130K rows                                                 │ │
-└───────────────────────────────────────────────────────────────────┘ │
+OpenClaw Gateway
+├── Sam (agent:main)
+│   └── rag-mcp-server-sam ──────────────────────────┐
+│                                                  │
+│   nutanix_rag_search.py ─────────────────────┐   │
+│   (direct two-pass search, no MCP)          │   │
+│                                                  │   │
+└── NX_Shield (agent:nutanix_shield)            │   │
+    └── rag-mcp-server ─────────────────────────┼───┘
+                                                  │
+                                                  ▼
+                                    ┌──────────────────────────┐
+                                    │ MCP Server (Python)      │
+                                    │ port 8004 (Sam)          │
+                                    │ port 8001 (NX_Shield)    │
+                                    │ mcp_server.py            │
+                                    │ --rerank-top 30          │
+                                    └──────────┬───────────────┘
+                                               │
+                                               ▼
+                                    ┌──────────────────────────┐
+                                    │ LanceDB                  │
+                                    │ nutanix_rag_v3.lance     │
+                                    │ ~1.2GB, ~130K rows        │
+                                    └──────────────────────────┘
 ``` 
 
 ## Design Decisions
