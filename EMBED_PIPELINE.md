@@ -1,7 +1,7 @@
 # NX_Shield RAG Embedding Pipeline — Documentation
 
 > **Last updated:** 2026-05-03
-> **Script:** `embed_pipeline_v2.py` + `tagger_v3.py`
+> **Script:** `embed_pipeline_v3.py` + `tagger_v3.py`
 > **Status:** Active — used for initial ingestion, incremental updates, and metadata enrichment
 
 ---
@@ -10,14 +10,14 @@
 
 The ingestion pipeline for the Nutanix RAG knowledge base. It scans markdown/text/HTML/PDF files from the source document repository, chunks them intelligently, extracts rich metadata, embeds them via Jina AI, and stores the results in LanceDB (`nutanix_rag_v3`).
 
-The pipeline uses `embed_pipeline_v2.py` for chunking and embedding, and `tagger_v3.py` for post-embedding metadata enrichment (access level, product detection, ecosystem entities, content types, versions).
+The pipeline uses `embed_pipeline_v3.py` for chunking, embedding, and metadata extraction. `tagger_v3.py` is imported as a module and applied inline during chunking — not as a separate post-enrichment step. The script also handles file-level and chunk-level deduplication, and text normalization.
 
 It supports two modes:
 
 | Mode | Command | Use Case |
 |---|---|---|
-| **Incremental** | `python embed_pipeline_v2.py` | Add/update individual files without rebuilding everything |
-| **Full rebuild** | `python embed_pipeline_v2.py --clean` | Complete rebuild from scratch (old table backed up first) |
+| **Incremental** | `python embed_pipeline_v3.py` | Add/update individual files without rebuilding everything |
+| **Full rebuild** | `python embed_pipeline_v3.py --clean` | Complete rebuild from scratch (old table backed up first) |
 
 ---
 
@@ -45,12 +45,14 @@ SOURCE REPOSITORY
   |     - 1024 tokens per chunk / 100 token overlap
   |     - Hard-split fallback for oversized sections
 
-  |  extract_metadata()
-  |  - Products (regex on 22 product patterns)
-  |  - Versions (AOS, AHV, Prism, NKP, NDB, Files, Objects)
-  |  - Content types (api-reference, troubleshooting, etc.)
-  |  - Folder (top-level directory)
-  |
+  |  apply_v3_tags() — from tagger_v3 (inline, not a separate step)
+  |  - access_level, doc_type, primary_product (path-based)
+  |  - mentioned_products, ecosystem_entities (regex from text)
+  |  - versions, content_types (text + path detection)
+  |  - File-level dedup (MD5 of normalized content)
+  |  - Chunk-level dedup (MD5 of normalized chunk text)
+  |  - Text normalization (strips boilerplate + whitespace)
+
   BATCH EMBEDDING
   |
   |  embed_texts() — Jina API primary (90s timeout + 1 retry)
@@ -60,7 +62,6 @@ SOURCE REPOSITORY
   LANCEDB (nutanix_rag_v3)
   |
   |  add_chunks_to_table() — add to nutanix_rag_v3
-  |  tagger_v3.py — post-ingest metadata enrichment
   |  Checkpoint saved AFTER every file (crash-resilient)
   |
 Done. 129,732 records in LanceDB + checkpoint updated.
@@ -78,9 +79,9 @@ Done. 129,732 records in LanceDB + checkpoint updated.
 
 ---
 
-## V3 Schema (Post-Enrichment)
+## V3 Schema (Inline Tagging)
 
-After `tagger_v3.py` enrichment, the table schema contains:
+`embed_pipeline_v3.py` applies `tagger_v3.py` metadata inline during chunking. The table schema contains:
 
 | Field | Type | Description |
 |---|---|---|
@@ -101,9 +102,9 @@ After `tagger_v3.py` enrichment, the table schema contains:
 
 ---
 
-## V3 Metadata Enrichment (`tagger_v3.py`)
+## V3 Metadata (`tagger_v3.py`)
 
-`tagger_v3.py` is applied after initial ingestion to enrich each chunk with structured metadata:
+`tagger_v3.py` is imported as a module (`from tagger_v3 import apply_v3_tags`) and applied during chunking — not as a separate post-enrichment pass. The module provides:
 
 - **`get_access_level(rel_path)`** — Determines `public` or `internal` based on source folder
 - **`get_doc_type(rel_path)`** — Maps top-level folder to document type
@@ -218,19 +219,19 @@ Batch size: **5 texts per API call**
 ### Incremental Update
 
 ```bash
-python embed_pipeline_v2.py
+python embed_pipeline_v3.py
 ```
 
 ### Full Rebuild
 
 ```bash
-python embed_pipeline_v2.py --clean
+python embed_pipeline_v3.py --clean
 ```
 
 ### Test Mode (3 files only)
 
 ```bash
-python embed_pipeline_v2.py --test
+python embed_pipeline_v3.py --test
 ```
 
 ---
@@ -251,9 +252,9 @@ python embed_pipeline_v2.py --test
 ## Related Scripts
 
 | Script | Purpose |
-|---|---|
-| `embed_pipeline_v2.py` | Full ingestion pipeline |
-| `tagger_v3.py` | V3 metadata enrichment (access level, entities, content types) |
+|---|---|---|
+| `embed_pipeline_v3.py` | Full ingestion pipeline (chunking + embedding + inline metadata via tagger_v3) |
+| `tagger_v3.py` | V3 metadata extraction module (access level, entities, content types, versions) |
 | `selective_embed.py` | Incremental — embed specific files or folders |
 | `embed_portal.py` | Portal-specific scraping + embedding |
 | `embed_solutions.py` | Nutanix Solutions KB embedding |

@@ -28,8 +28,7 @@ DATA SOURCES
 v
 INGESTION PIPELINE
 |
-+-- embed_pipeline_v2.py (chunking + embedding)
-+-- tagger_v3.py (metadata enrichment)
++-- embed_pipeline_v3.py (chunking + embedding + inline tagging via tagger_v3)
 |
 v
 LANCEDB (nutanix_rag_v3 — 129,732 rows, ~1.2 GB)
