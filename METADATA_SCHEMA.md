@@ -8,52 +8,6 @@ The schema covers two concerns: filtering and ranking. Core fields: `access_leve
 
 ---
 
-## Before and After — Metadata Schema Evolution
-
-### What Changed from v2 to v3
-
-The original `nutanix_rag_v2` database had a simpler metadata schema with `category`, `subcategory`, and `products` fields. During the v3 rebuild, the schema was redesigned for two reasons:
-
-1. **Messy data** — 1,374 rows had `products` as plain text strings (`"NCP_Pure_Storage"`) instead of JSON arrays. 66 rows had empty `category`. Cleaning individual rows was fragile.
-2. **Poor filtering utility** — v2 lacked consistent `access_level`, `doc_type`, and `primary_product` fields, making pre-filtering at query time unreliable.
-
-Rather than patch v2's metadata, the decision was made to redesign the schema from scratch during the v3 rebuild.
-
-### v2 Schema
-
-| Field | Type | Issues |
-|---|---|---|
-| `category` | string | ~66 rows empty, inconsistent values |
-| `subcategory` | string | rarely populated |
-| `products` | string (non-JSON) | 1,374 rows had plain text like `"NCP,HPE,Dell"` instead of `["NCP", "HPE", "Dell"]` |
-| `primary_product` | string | often defaulted to `General` for non-portal docs |
-| `mentioned_products` | string | not a proper list |
-
-### v3 Schema (Current)
-
-| Field | Type | Notes |
-|---|---|---|
-| `access_level` | string | `public` \| `internal` — isolation mechanism |
-| `doc_type` | string | 15+ document types mapped from top-level folder |
-| `primary_product` | string | Path-based with frequency fallback — near 100% populated |
-| `mentioned_products` | list[string] | All Nutanix products found via regex — no limit |
-| `ecosystem_entities` | list[string] | **New in v3** — competitors and partners |
-| `versions` | list[string] | **New in v3** — version strings like `AOS_6.5` |
-| `content_types` | list[string] | **New in v3** — content subtype detection |
-
-### Data Quality After v3
-
-| Metric | v2 (before cleanup) | v3 |
-|---|---|---|
-| `primary_product` populated | ~66% | ~100% |
-| `doc_type` populated | partial | ~100% |
-| `access_level` | did not exist | ~100% |
-| `mentioned_products` non-null | partial | ~100% |
-| `ecosystem_entities` | did not exist | ~100% |
-| Version extraction | manual | automatic per chunk |
-
----
-
 ## Schema Fields
 
 | Field | Type | Description |
@@ -67,7 +21,6 @@ Rather than patch v2's metadata, the decision was made to redesign the schema fr
 | `content_types` | list[string] | Content subtypes detected from path + text (api-reference, troubleshooting, release-notes, etc.) |
 
 ---
-
 
 ## Field Design Rationale
 
@@ -256,3 +209,49 @@ The metadata serves two stages of the search pipeline:
 - **Frequency fallback exists because non-portal docs** (battlecards, scraped content) don't follow the portal folder structure. Without it, `primary_product` would default to `General` for most battlecards.
 - **Version extraction is approximate** — it catches standard patterns like `AOS 6.5` and `AHV 20220304`, but complex version strings may be missed. This is a known limitation.
 - **`content_types` is multi-valued** — a document can be both `release-notes` and `api-reference` if both patterns are detected.
+
+---
+
+## Before and After — v2 to v3
+
+### Why the Schema Changed
+
+The original `nutanix_rag_v2` database had a simpler metadata schema with `category`, `subcategory`, and `products` fields. During the v3 rebuild, the schema was redesigned for two reasons:
+
+1. **Messy data** — 1,374 rows had `products` as plain text strings (`"NCP_Pure_Storage"`) instead of JSON arrays. 66 rows had empty `category`. Cleaning individual rows was fragile.
+2. **Poor filtering utility** — v2 lacked consistent `access_level`, `doc_type`, and `primary_product` fields, making pre-filtering at query time unreliable.
+
+Rather than patch v2's metadata, the decision was made to redesign the schema from scratch during the v3 rebuild.
+
+### v2 Schema
+
+| Field | Type | Issues |
+|---|---|---|
+| `category` | string | ~66 rows empty, inconsistent values |
+| `subcategory` | string | rarely populated |
+| `products` | string (non-JSON) | 1,374 rows had plain text like `"NCP,HPE,Dell"` instead of `["NCP", "HPE", "Dell"]` |
+| `primary_product` | string | often defaulted to `General` for non-portal docs |
+| `mentioned_products` | string | not a proper list |
+
+### v3 Schema (Current)
+
+| Field | Type | Notes |
+|---|---|---|
+| `access_level` | string | `public` \| `internal` — isolation mechanism |
+| `doc_type` | string | 15+ document types mapped from top-level folder |
+| `primary_product` | string | Path-based with frequency fallback — near 100% populated |
+| `mentioned_products` | list[string] | All Nutanix products found via regex — no limit |
+| `ecosystem_entities` | list[string] | **New in v3** — competitors and partners |
+| `versions` | list[string] | **New in v3** — version strings like `AOS_6.5` |
+| `content_types` | list[string] | **New in v3** — content subtype detection |
+
+### Data Quality After v3
+
+| Metric | v2 (before cleanup) | v3 |
+|---|---|---|
+| `primary_product` populated | ~66% | ~100% |
+| `doc_type` populated | partial | ~100% |
+| `access_level` | did not exist | ~100% |
+| `mentioned_products` non-null | partial | ~100% |
+| `ecosystem_entities` | did not exist | ~100% |
+| Version extraction | manual | automatic per chunk |
