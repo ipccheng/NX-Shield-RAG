@@ -8,30 +8,24 @@ Two MCP servers run as system daemons on Mac mini, serving Nutanix RAG search to
 
 ```
 OpenClaw Gateway
-├── Sam (agent:main)
-│   └── rag-mcp-server-sam ──────────────────────────┐
-│                                                  │
-│   nutanix_rag_search.py ─────────────────────┐   │
-│   (direct two-pass search, no MCP)          │   │
-│                                                  │   │
-└── NX_Shield (agent:nutanix_shield)            │   │
-    └── rag-mcp-server ─────────────────────────┼───┘
-                                                  │
-                                                  ▼
-                                    ┌──────────────────────────┐
-                                    │ MCP Server (Python)      │
-                                    │ port 8004 (Sam)          │
-                                    │ port 8001 (NX_Shield)    │
-                                    │ mcp_server.py            │
-                                    │ --rerank-top 30          │
-                                    └──────────┬───────────────┘
-                                               │
-                                               ▼
-                                    ┌──────────────────────────┐
-                                    │ LanceDB                  │
-                                    │ nutanix_rag_v3.lance     │
-                                    │ ~1.2GB, ~130K rows        │
-                                    └──────────────────────────┘
+|
++-- Sam (agent:main)
+|       +-- rag-mcp-server-sam
+|       +-- nutanix_rag_search.py (direct, no MCP)
+|
++-- NX_Shield (agent:nutanix_shield)
+|       +-- rag-mcp-server
+|
++-------|
+        v
+MCP Server (mcp_server.py)
+  - port 8004 (Sam)
+  - port 8001 (NX_Shield)
+  - --rerank-top 30
+        |
+        v
+LanceDB (nutanix_rag_v3.lance)
+  ~1.2GB, ~130K rows
 ``` 
 
 ## Design Decisions
