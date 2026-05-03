@@ -308,15 +308,18 @@ rsync -avz ~/rag_backups/nutanix_rag_v3-latest/ \
 
 Keep **7 days** of snapshots minimum. The DB grows slowly with new content so rolling daily backups are manageable.
 
-### What's NOT Included
+### What's NOT Included in OpenClaw Backup
 
-| Item | Included in backup? | Notes |
+| Item | Included? | Notes |
 |---|---|---|
-| `nutanix_rag_v3.lance` | ❌ Not auto-backed up | Must back up manually |
-| `processed_files.json` | ❌ Part of source repo | Checkpoint for incremental ingest |
-| Source document repo | ❌ Lives separately | Must back up the source repo independently |
-| Jina API key | ❌ Not stored in DB | Stored in OpenClaw config / environment |
-| LM Studio models | ❌ Not in LanceDB | Gemma 4 31B model files are separate |
+| `nutanix_rag_v3.lance` | ✅ Included | Backed up via `.openclaw/memory/` in OpenClaw tar |
+| `processed_files.json` | ✅ Included | Backed up via `.openclaw/workspace/rag/` |
+| Source document repo | ✅ Included | `~/.openclaw/workspace/rag/nutanix/` is under `.openclaw/workspace/` |
+| OpenClaw config | ✅ Included | Config files in `.openclaw/` |
+| LM Studio model files | ❌ No | Model files live in the LM Studio app directory |
+| Jina API key | ❌ No | Stored in OpenClaw config / environment variables |
+
+The OpenClaw tar backup (3 AM, `backup-full.sh`) covers the entire `.openclaw/` directory, which includes both the LanceDB database and the source document repository. The only significant gaps are the LM Studio model binaries and the API key (which must be restored separately).
 
 ### Fresh Rebuild Path
 
