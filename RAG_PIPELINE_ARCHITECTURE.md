@@ -265,69 +265,37 @@ Maps topic → KB article number. Used in `score_multiplier` to boost KB-matchin
 
 ## LanceDB Backup
 
-The vector database is the core of the RAG system. Unlike config files, it is not included in the OpenClaw backup cron. A separate backup step is required.
+The LanceDB database (`nutanix_rag_v3.lance`) is included in the daily OpenClaw backup (3 AM, `backup-full.sh`). The backup tar archives the entire `.openclaw/` directory, which contains both the LanceDB database and the source document repository.
 
-### What to Back Up
+### Backup (Automatic)
 
+The OpenClaw tar backup runs daily at 3 AM and includes:
 ```
 ~/.openclaw/memory/lancedb-pro/nutanix_rag_v3.lance/   (~1.2 GB)
 ```
 
-This directory contains the LanceDB table data, vector indices, and scalar indices for `nutanix_rag_v3`.
+To trigger a manual backup:
+```bash
+tar -czf ~/openclaw_backups/YYYYMMDD-openclaw-backup.tar.gz \
+  -C /Users/ipccheng .openclaw
+```
 
-### Backup Methods
-
-**Option A — Tarball (simple, portable)**
+To manually back up LanceDB only (outside the cron):
 ```bash
 tar -czf ~/rag_backups/nutanix_rag_v3-$(date +%Y%m%d).tar.gz \
   ~/.openclaw/memory/lancedb-pro/nutanix_rag_v3.lance/
 ```
 
-**Option B — Rsync (faster for subsequent backups, keeps permissions)**
-```bash
-rsync -avz ~/.openclaw/memory/lancedb-pro/nutanix_rag_v3.lance/ \
-  ~/rag_backups/nutanix_rag_v3-latest/
-```
-
 ### Restore
 
+Extract from the OpenClaw backup tar:
 ```bash
-# 1. Stop any active ingest or search (prevents writes during restore)
-# 2. Replace the directory
-tar -xzf ~/rag_backups/nutanix_rag_v3-YYYYMMDD.tar.gz \
-  -C ~/.openclaw/memory/lancedb-pro/
-
-# Or for rsync restore:
-rsync -avz ~/rag_backups/nutanix_rag_v3-latest/ \
-  ~/.openclaw/memory/lancedb-pro/nutanix_rag_v3.lance/
-
-# 3. Restart the search service if needed
+tar -xzf YYYYMMDD-openclaw-backup.tar.gz -C /Users/ipccheng/
 ```
+
+This restores `.openclaw/` to `/Users/ipccheng/.openclaw/`, including the LanceDB directory at `/Users/ipccheng/.openclaw/memory/lancedb-pro/nutanix_rag_v3.lance/`.
 
 ### Retention
 
-Keep **7 days** of snapshots minimum. The DB grows slowly with new content so rolling daily backups are manageable.
-
-### What's NOT Included in OpenClaw Backup
-
-| Item | Included? | Notes |
-|---|---|---|
-| `nutanix_rag_v3.lance` | ✅ Included | Backed up via `.openclaw/memory/` in OpenClaw tar |
-| `processed_files.json` | ✅ Included | Backed up via `.openclaw/workspace/rag/` |
-| Source document repo | ✅ Included | `~/.openclaw/workspace/rag/nutanix/` is under `.openclaw/workspace/` |
-| OpenClaw config | ✅ Included | Config files in `.openclaw/` |
-| LM Studio model files | ❌ No | Model files live in the LM Studio app directory |
-| Jina API key | ❌ No | Stored in OpenClaw config / environment variables |
-
-The OpenClaw tar backup (3 AM, `backup-full.sh`) covers the entire `.openclaw/` directory, which includes both the LanceDB database and the source document repository. The only significant gaps are the LM Studio model binaries and the API key (which must be restored separately).
-
-### Fresh Rebuild Path
-
-If the DB is lost and no backup exists, recovery is possible via the source repo + pipeline scripts:
-
-1. Source docs exist → run `embed_pipeline_v2.py --clean` to re-ingest
-2. API keys available → Jina embedding continues as normal
-3. Full rebuild time: several hours depending on source volume
-
-This path is slower than restore-from-backup but doesn't lose data permanently.
+The OpenClaw backup script keeps **14 days** of snapshots on T7. The LanceDB table grows slowly with new content, so this is sufficient for recovery.
 
