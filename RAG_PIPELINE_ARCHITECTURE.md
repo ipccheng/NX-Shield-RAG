@@ -260,3 +260,71 @@ Maps topic → subcategory string. Used in `score_multiplier` for subcategory-ma
 
 ### `_KB_MAP`
 Maps topic → KB article number. Used in `score_multiplier` to boost KB-matching results.
+
+---
+
+## LanceDB Backup
+
+The vector database is the core of the RAG system. Unlike config files, it is not included in the OpenClaw backup cron. A separate backup step is required.
+
+### What to Back Up
+
+```
+~/.openclaw/memory/lancedb-pro/nutanix_rag_v3.lance/   (~1.2 GB)
+```
+
+This directory contains the LanceDB table data, vector indices, and scalar indices for `nutanix_rag_v3`.
+
+### Backup Methods
+
+**Option A — Tarball (simple, portable)**
+```bash
+tar -czf ~/rag_backups/nutanix_rag_v3-$(date +%Y%m%d).tar.gz \
+  ~/.openclaw/memory/lancedb-pro/nutanix_rag_v3.lance/
+```
+
+**Option B — Rsync (faster for subsequent backups, keeps permissions)**
+```bash
+rsync -avz ~/.openclaw/memory/lancedb-pro/nutanix_rag_v3.lance/ \
+  ~/rag_backups/nutanix_rag_v3-latest/
+```
+
+### Restore
+
+```bash
+# 1. Stop any active ingest or search (prevents writes during restore)
+# 2. Replace the directory
+tar -xzf ~/rag_backups/nutanix_rag_v3-YYYYMMDD.tar.gz \
+  -C ~/.openclaw/memory/lancedb-pro/
+
+# Or for rsync restore:
+rsync -avz ~/rag_backups/nutanix_rag_v3-latest/ \
+  ~/.openclaw/memory/lancedb-pro/nutanix_rag_v3.lance/
+
+# 3. Restart the search service if needed
+```
+
+### Retention
+
+Keep **7 days** of snapshots minimum. The DB grows slowly with new content so rolling daily backups are manageable.
+
+### What's NOT Included
+
+| Item | Included in backup? | Notes |
+|---|---|---|
+| `nutanix_rag_v3.lance` | ❌ Not auto-backed up | Must back up manually |
+| `processed_files.json` | ❌ Part of source repo | Checkpoint for incremental ingest |
+| Source document repo | ❌ Lives separately | Must back up the source repo independently |
+| Jina API key | ❌ Not stored in DB | Stored in OpenClaw config / environment |
+| LM Studio models | ❌ Not in LanceDB | Gemma 4 31B model files are separate |
+
+### Fresh Rebuild Path
+
+If the DB is lost and no backup exists, recovery is possible via the source repo + pipeline scripts:
+
+1. Source docs exist → run `embed_pipeline_v2.py --clean` to re-ingest
+2. API keys available → Jina embedding continues as normal
+3. Full rebuild time: several hours depending on source volume
+
+This path is slower than restore-from-backup but doesn't lose data permanently.
+
