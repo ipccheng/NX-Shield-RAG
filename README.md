@@ -1,4 +1,4 @@
-# NX_Shield RAG Pipeline
+# NX Shield RAG
 
 A Retrieval-Augmented Generation (RAG) knowledge base for Nutanix technical support. Used by **Sam** and **NX_Shield** to answer Nutanix product, KB, and troubleshooting questions.
 
