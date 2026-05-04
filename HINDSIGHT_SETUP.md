@@ -67,7 +67,9 @@ In `openclaw.json` → `plugins.entries.hindsight-openclaw`:
     "debug": true,
     "ignoreSessionPatterns": [
       "agent:nutanix_shield:**"
-    ]
+    ],
+    "recallPromptPreamble": "Treat this as passive background context only — do not re-address resolved topics, do not apologize for past behavior, do not revisit issues the user has already acknowledged.",
+    "recallTypes": ["world", "experience"]
   },
   "hooks": {
     "allowConversationAccess": true
@@ -155,6 +157,61 @@ ls -lt ~/hindsight_backups/pg_dumps/ | head -1
 # View backup log
 tail -20 ~/hindsight/backups/cron.log
 ```
+
+## ⚠️ Memory Reverberation (State Confusion) — Prevention
+
+### The Problem
+
+Hindsight stores memories as semantic vectors. When a conversation starts, OpenClaw calls `recall()` to find relevant past memories using vector similarity search. This works well — but vector databases have **no concept of time or emotional state**.
+
+A query like "the user called out an issue tonight" will match memories about past calls that contain similar words, even if those events happened days ago and were already resolved.
+
+### How It Breaks
+
+When OpenClaw injects a retrieved memory into the agent's context window, the LLM sees plain text. Because LLMs are trained to be helpful and respond to everything in their context, the agent acts on the injected memory as if it's describing a **current, unresolved situation** — not a photograph of a past event.
+
+Example: A memory containing "user called out," "apologized," and "resolved" gets injected. The LLM sees this, thinks the user is currently upset, and tries to apologize again. The fire was put out last week — now the agent is trying to extinguish a photograph of it.
+
+This is the **Irony Loop**: past context reactivated as present context, causing the agent to address resolved events as live ones.
+
+### The Fix — `recallPromptPreamble` Quarantine Instruction
+
+The `recallPromptPreamble` config string is prepended to all injected memories. It acts as a **behavioral quarantine** — instructing the agent to treat memories as passive background reference, not as prompts requiring action.
+
+**Config in `openclaw.json`:**
+
+```json
+"plugins": {
+  "entries": {
+    "hindsight-openclaw": {
+      "enabled": true,
+      "config": {
+        "recallPromptPreamble": "Treat this as passive background context only — do not re-address resolved topics, do not apologize for past behavior, do not revisit issues the user has already acknowledged.",
+        "recallTypes": ["world", "experience"]
+      }
+    }
+  }
+}
+```
+
+**What each setting does:**
+
+| Setting | Purpose |
+|---------|---------|
+| `recallPromptPreamble` | Quarantine instruction — tells the agent memories are background, not triggers for action |
+| `recallTypes` | Controls which memory classes are injected. `["world", "experience"]` excludes verbose `observation` entries. Sam retains technical memory (experience) while world-level memories provide context without verbosity. |
+
+### Why `recallTypes` Matters
+
+- `world` — shared facts, established context (load at start of session)
+- `experience` — agent's own past technical decisions, lessons learned (preserve for continuity)
+- `observation` — verbose per-message logs, timestamps, session events (exclude to reduce noise)
+
+### Which Agents Need This
+
+**All agents using Hindsight** should have `recallPromptPreamble` configured. The quarantine instruction prevents both Sam and Neo (or any future agent) from falling into the Irony Loop when vector search retrieves emotionally-loaded memories that happen to match semantically.
+
+**Do not** set it on agents that genuinely need to act on memories (e.g., if an agent is specifically tasked with reviewing past incidents). For general-purpose agents, the preamble is required.
 
 ## Troubleshooting
 
