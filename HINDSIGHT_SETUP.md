@@ -213,6 +213,51 @@ The `recallPromptPreamble` config string is prepended to all injected memories. 
 
 **Do not** set it on agents that genuinely need to act on memories (e.g., if an agent is specifically tasked with reviewing past incidents). For general-purpose agents, the preamble is required.
 
+---
+
+## 🐛 Ghost Echo — Temporal Filtering Fix (queryTimestamp)
+
+### The Problem — "Ghost Echo"
+Agents using the `@lacneu/hindsight-openclaw` plugin suffer from **Memory Reverberation** (Ghost Echo). After resolving a query, Hindsight summarizes the exchange and immediately injects it back into the agent's prompt on the very next conversational turn. Because LLMs are instruction-tuned to be helpful, the agent treats this injected recent memory as an "unresolved" prompt — repeating its previous answer or repeatedly apologizing for past interactions.
+
+### Root Cause
+The Hindsight API natively supports a `query_timestamp` parameter designed to filter out recent memories by retrieving only vectors that existed before a specific time. However, the OpenClaw plugin's `scopeClient.recall()` wrapper was silently **dropping this parameter**, making temporal filtering impossible.
+
+### The Fix — `recallMinAgeSeconds`
+This patch introduces a configurable temporal boundary that mathematically excludes recent session memories from vector search. By default, any memory created within the last **3600 seconds (1 hour)** is invisible to recall — eliminating the Ghost Echo loop while preserving deep, long-term technical memory.
+
+**Files Modified:**
+
+- `dist/index.js` — Wrapper fix: explicitly forwards `queryTimestamp: req.queryTimestamp` to the HindsightClient
+- `dist/index.js` — Call site: `before_prompt_build` hook computes `queryTimestamp = now - recallMinAgeSeconds` and passes it into the recall payload
+- `openclaw.plugin.json` — Adds `recallMinAgeSeconds` to the config schema and UI hints
+
+### Configuration
+
+In `openclaw.json` under `plugins.entries.hindsight-openclaw.config`:
+
+```json
+{
+  "recallMinAgeSeconds": 3600
+}
+```
+
+| Parameter | Default | Purpose |
+|---|---|---|
+| `recallMinAgeSeconds` | `3600` | Minimum age in seconds for recalled memories. Excludes memories newer than this threshold. Set to `0` to disable. |
+
+### Validation
+
+Verify the patch is active — the compiled `dist/index.js` should contain the temporal filtering logic:
+
+```bash
+grep -n "recallMinAgeSeconds\|queryTimestamp" ~/.openclaw/extensions/hindsight-openclaw/dist/index.js
+```
+
+Expected output includes `recallMinAgeSeconds = pluginConfig.recallMinAgeSeconds ?? 3600` and `queryTimestamp` passed into the recall payload.
+
+---
+
 ## Troubleshooting
 
 **Agents not getting memories:**
