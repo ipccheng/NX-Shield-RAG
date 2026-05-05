@@ -256,6 +256,73 @@ grep -n "recallMinAgeSeconds\|queryTimestamp" ~/.openclaw/extensions/hindsight-o
 
 Expected output includes `recallMinAgeSeconds = pluginConfig.recallMinAgeSeconds ?? 3600` and `queryTimestamp` passed into the recall payload.
 
+### Ghost Echo v2 — Compaction Artifact (NOT a Hindsight Bug)
+
+#### The Symptom
+After deploying the temporal fix, a user question (`"did you use the rag for the summary?"`) appeared to trigger a second round of Ghost Echo. The agent responded as if the question was new, even though it had already been raised and partially addressed in the same session.
+
+#### Investigation
+
+Both of Hindsight's memory injection paths were traced end-to-end:
+
+| Path | Mechanism | Location | Status |
+|------|-----------|----------|--------|
+| **A — Auto-recall** | `before_prompt_build` hook queries LanceDB with `queryTimestamp` | `dist/index.js` L1628-1636 | ✅ Correctly filtered |
+| **B — Startup injection** | Same hook, runs on every prompt build including session start | Same code path | ✅ Handled by same patch |
+
+Both paths go through the same code chain:
+```
+Plugin (L1629): queryTimestamp = Date.now() - recallMinAgeSeconds * 1000
+  → scopeClient.recall() (L79): forwards queryTimestamp
+    → @vectorize-io/hindsight-client (L1322): sends query_timestamp to API
+      → Hindsight backend: applies temporal filter
+```
+
+**Verdict:** The temporal filter is working correctly. Hindsight is exonerated.
+
+#### The Real Root Cause: Compaction Artifact
+
+The root cause was an **agent-level error in handling compound prompts**, not a memory system bug:
+
+1. The user sent a compound prompt containing **two independent questions**:
+   - Q1: "Did you use RAG for the summary?"
+   - Q2: "Please scrape the attachments in the emails"
+2. The agent focused on Q2 (the actionable task: file extraction) and **completely skipped Q1**
+3. OpenClaw's compaction summarization preserved the unanswered question as an open loop
+4. On session restart (post-compaction), the dangling question appeared "fresh" — creating the illusion of a Ghost Echo
+
+**Why compaction preserves open questions:** OpenClaw compacts older conversation turns into a summary entry when approaching context limits. The compaction LM faithfully preserves what it sees — if a question was never explicitly acknowledged or answered, it survives summarization as an open inquiry. The agent re-entering context post-compaction has no way to distinguish "already resolved" from "actually unresolved."
+
+#### The Fix — Agent-Level Protocol
+
+Since the root cause is agent behavior (not a system bug), the fix lives in `AGENTS.md` as a fleet-wide interaction protocol:
+
+```markdown
+## [GLOBAL INTERACTION PROTOCOL: COMPOUND PROMPTS]
+
+**CRITICAL RULE:** When receiving a multi-part prompt, your attention mechanism MUST explicitly acknowledge and resolve EVERY part of the user's request.
+
+1. **Do not let sub-questions go unanswered or implicit.** Every question or request in a message must be addressed.
+2. **If prioritizing an action** (like executing code, reading files, or searching), you must verbally answer the conversational questions first (e.g., "Yes, I used RAG. Now, let me extract the file...").
+3. **Leaving questions unanswered causes fatal state corruption** during OpenClaw memory compaction. The compaction summary preserves the open loop, and on restart the dangling question appears "fresh," creating confusion and wasted turns.
+```
+
+#### Deployed To
+
+| Host | File | Insertion Point |
+|------|------|----------------|
+| Mac Mini | `~/.openclaw/workspace/AGENTS.md` | Between "Technical Accuracy Rule" and "Receiving Config from Other AIs" |
+| MacBook | `~/.openclaw/workspace/AGENTS.md` | Between "Technical Accuracy Rule" and "Group Chats" |
+
+#### Lessons Learned
+
+1. **Agent behavior > system patches** — The Hindsight temporal filter was correct, but agent behavior left open loops that compaction preserved
+2. **Compound prompts are dangerous** — Every sub-request must be explicitly acknowledged before prioritizing
+3. **Compaction is a feature, not a bug** — It faithfully preserves what it sees; unresolved questions naturally survive summarization
+4. **The symptom looked identical to Ghost Echo** — When debugging a suspected memory loop, first check: "did the agent actually answer this?" before chasing memory systems
+
+Both patches — the temporal filter fix AND the compound prompt protocol — are required together. The temporal filter prevents Hindsight-level Ghost Echo; the protocol prevents agent-level Ghost Echo from compaction artifacts.
+
 ---
 
 ## Troubleshooting
