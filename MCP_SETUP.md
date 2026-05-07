@@ -188,3 +188,54 @@ kill <PID>
 # Then restart via launchd
 launchctl start com.samai.mcp-nutanix-rag
 ```
+
+## Known Bugs & Fixes
+
+### `TypeError: 'NoneType' object is not callable` — Starlette SSE Endpoint Crash
+
+**Symptom:** MCP server crashes with the following error every time a tool call is made:
+
+```
+File "/.../starlette/routing.py", line 62, in app
+    await response(scope, receive, send)
+TypeError: 'NoneType' object is not callable
+```
+
+**Root Cause:** When Starlette routes a request to a function endpoint defined as `async def endpoint(request)`, it wraps it in `request_response()` which creates an inner app expecting a return value. If the endpoint function signature is `async def endpoint(request)`, it receives a high-level `Request` object and MUST return a `Response` object. Returning `None` causes Starlette to try calling `None()` as if it were a callable.
+
+The MCP SSE endpoints use low-level ASGI streams (`scope`, `receive`, `send`) internally but were declared with a single `request` argument. Since they don't return anything (they yield streams), Starlette received `None` as the "response" and crashed.
+
+**Fix:** Wrap each endpoint in a class that implements the pure ASGI `__call__(scope, receive, send)` interface. Starlette's `Route` checks `isinstance(type(endpoint), type)` — if the endpoint is a class (not a function), it routes it directly as an ASGI app without wrapping it in `request_response()`.
+
+```python
+# ❌ WRONG — Starlette wraps this in request_response(), expects a Response return
+async def endpoint_sse(request):
+    async with sse.connect_sse(request.scope, request.receive, request._send) as streams:
+        await server.run(streams[0], streams[1], ...)
+
+# ✅ CORRECT — class with __call__ gets routed as pure ASGI, no Response needed
+class _ASGIEndpointWrapper:
+    """Wraps a (scope, receive, send) ASGI callable for pure-ASGI routing in Starlette."""
+    def __init__(self, fn):
+        self.fn = fn
+    async def __call__(self, scope, receive, send):
+        await self.fn(scope, receive, send)
+
+async def endpoint_sse_raw(scope, receive, send):
+    async with sse.connect_sse(scope, receive, send) as streams:
+        await server.run(streams[0], streams[1], server.create_initialization_options())
+
+endpoint_sse = _ASGIEndpointWrapper(endpoint_sse_raw)
+```
+
+**Additional note:** The exception handler must use the `(request, exc)` signature — Starlette's `ExceptionMiddleware` calls it with two arguments, not four.
+
+```python
+# ❌ WRONG — four-argument signature
+async def global_exception_handler(scope, receive, send, exc): ...
+
+# ✅ CORRECT — two-argument signature  
+async def global_exception_handler(request, exc):
+    import traceback
+    return JSONResponse(content={"error": str(exc), "trace": traceback.format_exc()[-500:]}, status_code=500)
+```
