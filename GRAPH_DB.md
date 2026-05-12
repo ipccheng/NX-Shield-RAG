@@ -43,7 +43,7 @@ The Graph DB is an embedded Kuzu database that stores entity relationships extra
 | **LanceDB** | `~/.openclaw/memory/lancedb-pro/nutanix_rag_v3_dedup.lance` |
 | **Kuzu DB** | `~/.openclaw/memory/kuzu-pro/nutanix_graph_v3` |
 | **Vault JSONL** | `~/.openclaw/memory/kuzu-pro/minimax_extraction_vault.jsonl` |
-| **Database Archive** | `~/.openclaw/memory/kuzu-pro/ARCHIVED_may9_corrupt/` |
+
 
 ---
 
@@ -132,17 +132,6 @@ Some entities appear in relationship rows but NOT in the vault's `entities` list
 - LanceDB connected to `nutanix_rag_v3_dedup`
 - Vault JSONL file at `minimax_extraction_vault.jsonl`
 
-### Rebuild from Scratch
-
-```bash
-# Remove old DB
-rm -f ~/.openclaw/memory/kuzu-pro/nutanix_graph_v3
-rm -f ~/.openclaw/memory/kuzu-pro/nutanix_graph_v3.wal
-
-# Run the rebuild script
-python3 /tmp/kuzu_rebuild_v3.py
-```
-
 ### What the Build Does
 
 1. **Loads valid chunk_hashes** from LanceDB `nutanix_rag_v3_dedup`
@@ -227,24 +216,6 @@ When new documents are embedded via `embed_one.py`, the following flow occurs:
 2. **Kuzu insert** → `kuzu_writer.write_chunk_batch()` creates Chunk nodes by chunk_hash (MERGE)
 
 The entity/relationship extraction (MiniMax API) is a separate batch process that feeds into the vault JSONL. The per-file embed script does NOT run MiniMax extraction — it only creates the Chunk node for graph-to-vector bridging.
-
----
-
-## Migrating from v2 (Legacy)
-
-The old Kuzu DB (`nutanix_graph_v2`) had a different schema with Doc, Product, Version, ContentType tables. The v3 schema is simplified:
-
-| Aspect | v2 (Old) | v3 (Current) |
-|---|---|---|
-| Chunk PK | `rel_path` | `chunk_hash` (links to LanceDB) |
-| Entity | 28k nodes | 48k nodes |
-| Edges | 65k (MENTIONS_PRODUCT, HAS_ECOSYSTEM) | 334k (HAS_RELATIONSHIP, RELATED_TO) |
-| Sources | LanceDB metadata only | MiniMax vault extraction |
-| CLI query | `kuzu-query` | `kuzu-query` or Python |
-
-### Migration Path
-
-The old v2 DB is archived at `ARCHIVED_may9_corrupt/`. No migration needed — the v3 build is a clean rebuild from the vault JSONL.
 
 ---
 
