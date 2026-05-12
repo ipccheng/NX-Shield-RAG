@@ -20,6 +20,44 @@ from tagger_v3 import extract_ecosystem_entities, extract_mentioned_products
 
 NX_MODEL_RE = re.compile(r'nx-\d{4}[a-z]?(-\w+)?-g10', re.IGNORECASE)
 
+KUZU_DB_PATH = os.path.expanduser("~/.openclaw/memory/kuzu-pro/nutanix_graph_v3")
+
+
+def get_graph_entities(query: str) -> dict:
+    """Query Kuzu graph DB for entities connected to query terms.
+    Returns a dict: entity_name -> list of rel_types.
+    These entity names match LanceDB's ecosystem_entities / mentioned_products columns.
+    """
+    try:
+        import kuzu
+        db = kuzu.Database(KUZU_DB_PATH)
+        conn = kuzu.Connection(db)
+        # Combine query terms + tagger entities for broader coverage
+        tagged = extract_ecosystem_entities(query) + extract_mentioned_products(query)
+        terms = [t.upper() for t in set(query.split()) if len(t) > 2]
+        all_terms = list({t.upper() for t in set(terms + [e.upper() for e in tagged])})
+        entity_map = {}  # entity_name -> [rel_type, ...]
+        for term in all_terms:
+            try:
+                result = conn.execute(
+                    "MATCH (c:Chunk)-[r]->(e:Entity) "
+                    "WHERE e.name CONTAINS $term "
+                    "RETURN DISTINCT e.name, r.rel_type "
+                    "LIMIT 100",
+                    parameters={"term": term},
+                )
+                for row in result.get_all():
+                    if row[0]:
+                        if row[0] not in entity_map:
+                            entity_map[row[0]] = []
+                        if row[1] not in entity_map[row[0]]:
+                            entity_map[row[0]].append(row[1])
+            except Exception:
+                continue
+        return entity_map
+    except Exception:
+        return {}
+
 
 def _call_deepseek(prompt: str) -> str:
     """Call DeepSeek via API. Returns content or empty string on failure."""
@@ -917,12 +955,14 @@ def run_search(query: str, limit: int = 5, fetch_n: int = 100, rrf_k: int = 60, 
     db = lancedb.connect(str(DB_PATH))
     t = db.open_table("nutanix_rag_v3_dedup")
 
-    # ── PARALLEL: Run DeepSeek classify (for scoring) + embed (for search) simultaneously ──
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+    # ── PARALLEL: DeepSeek classify + embed + Kuzu graph walk simultaneously ──
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
         f_topics = ex.submit(classify, query)
         f_emb = ex.submit(jina_embed, query)
+        f_graph = ex.submit(get_graph_entities, query)
         topics = f_topics.result()
         emb_query = f_emb.result()
+        graph_entities = f_graph.result()
 
     print(f"Topics: {topics}", file=sys.stderr)
     print(f"Query: {query}\n", file=sys.stderr)
@@ -982,6 +1022,30 @@ def run_search(query: str, limit: int = 5, fetch_n: int = 100, rrf_k: int = 60, 
     # Sort by boosted RRF score then take top rerank_top for reranking
     rrf_sorted = sorted(unique, key=lambda x: -x.get("rrf_score", 0))[:rerank_top]
     print(f"  [{len(unique)}] unique, reranking top {len(rrf_sorted)}...", file=sys.stderr)
+
+    # ── Graph Boost: add structural signal from Kuzu entity co-occurrence ──────
+    # Kuzu returns entity names connected to query terms.
+    # Match these against LanceDB's ecosystem_entities and mentioned_products columns.
+    if graph_entities:
+        print(f"  [Graph] {len(graph_entities)} entity types verified by Kuzu graph", file=sys.stderr)
+        for r in rrf_sorted:
+            row_entities = set()
+            row_entities.update(r.get("ecosystem_entities") or [])
+            row_entities.update(r.get("mentioned_products") or [])
+            row_entities_up = {e.upper() for e in row_entities}
+            # Fuzzy match: Kuzu entities are granular ("NCC_GUIDE_V5_3"), LanceDB has short names ("NCC")
+            matched_ents = [e for e in graph_entities
+                            if any(e.upper() in p.upper() or p.upper() in e.upper()
+                                   for p in row_entities)]
+            is_verified = len(matched_ents) > 0
+            r["_graph_verified"] = is_verified
+            r["_graph_entities"] = matched_ents
+            if is_verified:
+                r["rrf_score"] = r.get("rrf_score", 0) + 0.15
+    else:
+        for r in rrf_sorted:
+            r["_graph_verified"] = False
+            r["_graph_entities"] = []
 
     # ── 1A: Expand to ±2 neighbor context BEFORE cross-encoder ───────────────
     # Merge chunk ± window neighbors into one text block so the CE scores
@@ -1050,7 +1114,8 @@ def format_results(results: list, query: str) -> str:
     for i, r in enumerate(results, 1):
         src = r.get("source", "unknown")
         txt = r.get("text", "").replace("&#xA0;", " ").replace("&amp;", "&").replace("\n", " ").strip()
-        lines.append(f"\n[{i}] {src}")
+        graph_tag = " [GRAPH]" if r.get("_graph_verified") else ""
+        lines.append(f"\n[{i}] {src}{graph_tag}")
         lines.append(f"    ce={r.get('_ce_score',0):.3f} × {r.get('_multiplier',1):.2f} = {r.get('_score',0):.3f}")
         lines.append(f"    {txt[:600]}...")
     return "\n".join(lines)
