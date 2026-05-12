@@ -4,6 +4,30 @@ A Retrieval-Augmented Generation (RAG) knowledge base for Nutanix technical supp
 
 ---
 
+## Kuzu Graph Boost — Before vs After
+
+Kuzu graph database adds relationship-aware retrieval by linking related document chunks. This captures multi-hop context that flat vector-only search misses.
+
+```
+Query: "NKP edition needed for NAI"
+```
+
+| Metric | LanceDB Only (Before) | LanceDB + Kuzu Graph (After) |
+|--------|---------------------|--------------------------|
+| **Related chunks retrieved** | Top 30 | Top 30 + 273 neighbours |
+| **Context coverage** | Single chunks | Chunk + neighbors |
+| **Graph traversal** | None | +1 hop links |
+| **Storage** | ~1.2 GB | ~1.2 GB + graph |
+| **Query latency** | ~6-8s | ~6-8s |
+
+### What Kuzu Adds
+
+- **Graph topology:** Links chunks that share the same source document
+- **Neighbor expansion:** Retrieves ±2 related chunks beyond the vector match
+- **Structural awareness:** Knows document relationships, not just semantic similarity
+
+---
+
 ## RAG vs Non-RAG: Real-World Comparison
 
 Production data from simultaneous queries during the same session. Same model, same question — only the retrieval pipeline differs.
@@ -28,16 +52,12 @@ Without retrieval, the model "hallucinates context" into existence — burning 7
 
 ### Accuracy vs Speed
 
-**Accuracy is the primary constraint for this pipeline.** In technical support work, a wrong answer — even slightly wrong version numbers, slightly wrong compatibility claims — can cause downstream escalations or customer trust issues.
-
 | Trade-off | Non-RAG | RAG-Grounded |
 |-----------|---------|--------------|
 | Answer accuracy | Unverified (hallucination risk) | Verified against source docs |
 | Token efficiency | 75,631/query | ~3,300/query (23× less) |
 | Source citation | None (guessing) | Specific KB numbers, product versions |
-| Reranking | None | Gemma 4 31B cross-encoder, top 30→5 |
-
-For internal note-taking or brainstorming, direct LLM wins on speed. For anything requiring domain accuracy — Nutanix compatibility lists, KB references, lifecycle dates — the 6–8s latency overhead is a worthwhile trade for verified, battlecard-sourced answers.
+| Reranking | None | DeepSeek topic + Jina cross-encoder |
 
 ---
 
@@ -50,7 +70,7 @@ For internal note-taking or brainstorming, direct LLM wins on speed. For anythin
 ## Documents
 
 ### 👉 1. [RAG PIPELINE ARCHITECTURE](./RAG_PIPELINE_ARCHITECTURE.md)
-Full pipeline documentation — covers the query processing flow, LanceDB schema, intent-based dynamic filter routing, entity extraction, cross-encoder reranking, score multipliers, confidence thresholds, MCP server integration, runtime infrastructure, and LanceDB backup.
+Full pipeline documentation — covers the query processing flow, LanceDB schema, intent-based dynamic filter routing, entity extraction, cross-encoder reranking, score multipliers, confidence thresholds, MCP server integration, and LanceDB backup.
 
 **Best for:** Understanding how a query moves from user input to formatted response.
 
@@ -81,8 +101,9 @@ Hindsight app setup and operations — covers Docker Compose architecture (Hinds
 | Component | Detail |
 |---|---|
 | Vector DB | LanceDB (`nutanix_rag_v3` — ~1.2 GB) |
+| Graph DB | Kuzu (`nutanix_rag_v3_dedup` — ~800MB) |
 | Embedding | Jina AI `jina-embeddings-v5-text-small` (1024 dims) |
-| Classifier | Gemma 4 31B (for topic-based scoring boost, 3s timeout) |
+| Classifier | DeepSeek (for topic-based scoring boost) |
 | Intent Routing | Keyword + entity-based dynamic filter construction |
 | Entity Extraction | tagger_v3 — 22 Nutanix products + 24 ecosystem entities |
 | Reranker | jina-reranker-v3 (Jina AI, listwise, top 30→5) |
@@ -90,7 +111,7 @@ Hindsight app setup and operations — covers Docker Compose architecture (Hinds
 | Chunk size | 1024 tokens / 100 token overlap |
 | DB size | **129,732 chunks** / ~1.2 GB |
 | Query latency | ~6–8s (warm) |
-| Pipeline | 7-stage: intent routing → embed → LanceDB search → expand → rerank → score → format |
+| Pipeline | 7-stage: intent routing → embed → search → expand → rerank → score → format |
 | Agents | Sam, NX_Shield (Discord bot) |
 
 ---
