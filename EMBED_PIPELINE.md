@@ -1,23 +1,26 @@
 # NX_Shield RAG Embedding Pipeline — Documentation
 
-> **Last updated:** 2026-05-03
-> **Script:** `embed_pipeline_v3.py` + `tagger_v3.py`
-> **Status:** Active — used for initial ingestion, incremental updates, and metadata enrichment
+> **Last updated:** 2026-05-12
+> **Scripts:** `embed_pipeline_v3.py` (batch) / `embed_one.py` (single file) + `tagger_v3.py` + `kuzu_writer.py`
+> **Status:** Active — 85,642 chunks in LanceDB `nutanix_rag_v3_dedup`, 72,489 Chunk nodes in Kuzu `nutanix_graph_v3`
 
 ---
 
 ## Overview
 
-The ingestion pipeline for the Nutanix RAG knowledge base. It scans markdown/text/HTML/PDF files from the source document repository, chunks them intelligently, extracts rich metadata, embeds them via Jina AI, and stores the results in LanceDB (`nutanix_rag_v3`).
+The ingestion pipeline for the Nutanix RAG knowledge base. It scans markdown/text/HTML/PDF files from the source document repository, chunks them intelligently, extracts rich metadata, embeds them via Jina AI, stores them in LanceDB (`nutanix_rag_v3_dedup`), and updates the Kuzu graph DB (`nutanix_graph_v3`).
 
-The pipeline uses `embed_pipeline_v3.py` for chunking, embedding, and metadata extraction. `tagger_v3.py` is imported as a module and applied inline during chunking — not as a separate post-enrichment step. The script also handles file-level and chunk-level deduplication, and text normalization.
+The primary per-file script is `embed_one.py`. `embed_pipeline_v3.py` handles batch embedding of many files at once. `tagger_v3.py` provides inline metadata extraction (products, ecosystem entities, versions). `kuzu_writer.py` creates Chunk nodes in Kuzu for graph-to-vector bridging.
 
-It supports two modes:
+**Key change (2026-05-12):** Deduplication at embed time. The pipeline checks each chunk's `chunk_hash` against the LanceDB table BEFORE calling the Jina embedding API — saving API costs on duplicate chunks. Insert uses `merge_insert("chunk_hash")` instead of plain `add()`.
+
+It supports three modes:
 
 | Mode | Command | Use Case |
 |---|---|---|
-| **Incremental** | `python embed_pipeline_v3.py` | Add/update individual files without rebuilding everything |
-| **Full rebuild** | `python embed_pipeline_v3.py --clean` | Complete rebuild from scratch (old table backed up first) |
+| **Single file** | `python3 embed_one.py <rel_path>` | Embed a single file (preferred for daily updates) |
+| **Batch incremental** | `python3 embed_pipeline_v3.py` | Add/update many files without rebuilding everything |
+| **Full rebuild** | `python3 embed_pipeline_v3.py --clean` | Complete rebuild from scratch (old table backed up first) |
 
 ---
 
@@ -26,18 +29,13 @@ It supports two modes:
 ```
 SOURCE REPOSITORY
 
-  get_all_files()
-  ├── Text files: *.md, *.txt, *.html
-  ├── Code files: *.py, *.go, *.yaml, *.yml, *.tf, *.sh, *.php, *.js, *.json
-  └── PDF files: *.pdf (parsed via Docling or markitdown)
+  embed_one.py <rel_path>  OR  embed_pipeline_v3.py
 
   Per file:
-  ├── Checkpoint skip — skip if already processed
-  ├── SKIP_FILES — user-requested skips
-  └── LARGE_FILES — pre-chunked to stay under token limit
-
-  +--> LARGE FILE PRE-CHUNK
-  |     split_large_file() — Slack: message-split; GitHub: hard-split
+  ├── Checkpoint skip — skip if content_hash unchanged
+  ├── File-level dedup (MD5 of normalized content)
+  ├── Quality check — reject garbage content (HTML entities, low alpha ratio)
+  └── LARGE_FILE pre-chunking (Slack: 60K split; GitHub: 45K split)
 
   +--> SMART CHUNKING
   |     split_into_chunks()
@@ -45,26 +43,39 @@ SOURCE REPOSITORY
   |     - 1024 tokens per chunk / 100 token overlap
   |     - Hard-split fallback for oversized sections
 
-  |  apply_v3_tags() — from tagger_v3 (inline, not a separate step)
+  |  apply_v3_tags() — from tagger_v3 (inline)
   |  - access_level, doc_type, primary_product (path-based)
   |  - mentioned_products, ecosystem_entities (regex from text)
   |  - versions, content_types (text + path detection)
-  |  - File-level dedup (MD5 of normalized content)
-  |  - Chunk-level dedup (MD5 of normalized chunk text)
+  |  - HPE hardware detection (new 2026-05-12)
   |  - Text normalization (strips boilerplate + whitespace)
+
+  ┌─ PRE-EMBED DEDUP ──────────────────────────────────────────┐
+  │  For each chunk's chunk_hash, check if it exists in the    │
+  │  LanceDB table (reads only chunk_hash column via column    │
+  │  projection, avoiding loading vectors into RAM). Skip the   │
+  │  Jina API call for duplicates. Saves money on re-embeds.    │
+  └─────────────────────────────────────────────────────────────┘
 
   BATCH EMBEDDING
   |
-  |  embed_texts() — Jina API primary (90s timeout + 1 retry)
+  |  embed_texts() — Jina API primary
   |  embed_texts() — LM Studio fallback (localhost:1234)
   |  Batch size: 5 texts per API call
   |
-  LANCEDB (nutanix_rag_v3)
+  LANCEDB (nutanix_rag_v3_dedup)
   |
-  |  add_chunks_to_table() — add to nutanix_rag_v3
+  |  merge_insert("chunk_hash") — dedup on insert
+  |  when_not_matched_insert_all() — only new chunks
   |  Checkpoint saved AFTER every file (crash-resilient)
   |
-Done. 129,732 records in LanceDB + checkpoint updated.
+  KUZU GRAPH (nutanix_graph_v3)
+  |
+  |  kuzu_writer.write_chunk_batch() — MERGE Chunk nodes
+  |  By chunk_hash — creates graph-to-vector bridge
+  |  Entity/relationship edges from vault extraction
+  |
+Done. 85,642 records in LanceDB + checkpoint updated.
 ```
 
 ---
@@ -79,9 +90,22 @@ Done. 129,732 records in LanceDB + checkpoint updated.
 
 ---
 
-## V3 Schema (Inline Tagging)
+## Database Tables
 
-`embed_pipeline_v3.py` applies `tagger_v3.py` metadata inline during chunking. The table schema contains:
+### LanceDB: `nutanix_rag_v3_dedup` (85,642 records)
+
+Built by deduplicating `nutanix_rag_v3_with_hash` (129,845 records) by (`chunk_hash`, `rel_path`, `chunk_index`).
+
+**Indices:**
+| Index Type | Column | Params |
+|---|---|---|
+| BTree | `chunk_hash` | — |
+| FTS | `text` | Tantivy |
+| IVF_HNSW_SQ | `vector` | m=20, ef_construction=300, cosine |
+
+The old full table `nutanix_rag_v3` (129,845 records) is archived as `nutanix_rag_v3_archive`.
+
+The table schema contains:
 
 | Field | Type | Description |
 |---|---|---|
@@ -97,8 +121,12 @@ Done. 129,732 records in LanceDB + checkpoint updated.
 | `versions` | string[] | Version strings like `AOS_7.5` |
 | `content_types` | string[] | Taxonomy: api-reference, troubleshooting, etc. |
 | `chunk_index` | int | Position in source document |
-| `content_hash` | string | Content dedup hash |
-| `chunk_hash` | string | Chunk-level dedup hash |
+| `content_hash` | string | Content dedup hash (file-level) |
+| `chunk_hash` | string | Chunk-level dedup hash (MD5 of normalized chunk text) |
+
+### Kuzu Graph: `nutanix_graph_v3` (72,489 Chunk nodes, 48,483 Entity nodes)
+
+See `GRAPH_DB.md` for full schema and query patterns.
 
 ---
 
@@ -175,9 +203,9 @@ Batch size: **5 texts per API call**
 **`add_chunks_to_table(table, chunks, embeddings, batch_info)`** — Batch insert
 
 **Index build (post-swap):**
-1. **IvfHnswPq vector index** — `m=16`, `ef_construction=200`, L2 metric
-2. **Tantivy FTS index** — on `text` column
-3. **Scalar indices** — on `primary_product`, `source`, `rel_path`, `access_level`, `doc_type`
+1. **IVF_HNSW_SQ vector index** — `m=20`, `ef_construction=300`, cosine metric
+2. **FTS index** — on `text` column
+3. **BTree scalar index** — on `chunk_hash`
 
 ### Checkpoint System
 
@@ -265,13 +293,15 @@ python embed_pipeline_v3.py --test
 ## Change Log
 
 | Date | Change |
+| Date | Change |
 |---|---|
+| 2026-05-12 | **Major pipeline overhaul.** Switched to `nutanix_rag_v3_dedup` (85k deduped records). Added pre-embed dedup (checks chunk_hash before Jina API call). Switched to `merge_insert("chunk_hash")` from `table.add()`. Added Kuzu graph integration (Chunk nodes by chunk_hash). Updated vector index to IVF_HNSW_SQ (m=20, ef=300). `embed_one.py` is now the primary embed tool. HPE hardware tagging added to `tagger_v3.py`. |
 | 2026-05-03 | Updated documentation for nutanix_rag_v3 schema, tagger_v3.py enrichment, IvfHnswPq index |
 | 2026-04-23 | Added Docling PDF parsing (table-aware). Added `*.pdf` to supported file types. |
 | 2026-04-23 | Added code file extensions: `*.py`, `*.go`, `*.yaml`, `*.yml`, `*.tf`, `*.sh`, `*.php`, `*.js`, `*.json` |
 | 2026-04-23 | Added `non_advisory_backup.json` to SKIP_FILES |
 | 2026-04-23 | Updated HNSW index params: `m=16`, `ef_construction=200` |
-| 2026-04-23 | Added `wait_for_index([\"text_idx\"])` for race condition prevention |
+| 2026-04-23 | Added `wait_for_index(["text_idx"])` for race condition prevention |
 | 2026-04-23 | Scalar indices on `products`, `subcategory`, `folder`, `category` |
 | 2026-04-19 | Added Vanguard, Move, Era to PRODUCT_PATTERNS |
 | 2026-04-16 | Added NCC, X-Ray, Calm, Volumes to PRODUCT_PATTERNS |
