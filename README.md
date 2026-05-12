@@ -65,6 +65,8 @@ Without retrieval, the model "hallucinates context" into existence — burning 7
 
 ![NX_Shield RAG Pipeline Architecture](https://github.com/ipccheng/rag-pipeline/blob/main/RAG%20Pipeline%20Diagram.png)
 
+**Source file:** [RAG_Pipeline_Diagram.drawio](https://github.com/ipccheng/rag-pipeline/blob/main/RAG_Pipeline_Diagram.drawio) — edit in draw.io or VS Code extension
+
 ---
 
 ## Documents
