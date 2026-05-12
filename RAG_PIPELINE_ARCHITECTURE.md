@@ -298,3 +298,22 @@ This restores `.openclaw/` to `/Users/ipccheng/.openclaw/`, including the LanceD
 
 The OpenClaw backup script keeps **14 days** of snapshots on T7. The LanceDB table grows slowly with new content, so this is sufficient for recovery.
 
+
+---
+
+## Changelog
+
+### 2026-05-12
+- Replaced **Gemma** with **DeepSeek** for topic classification
+- Added **nutanix_rag_v3_dedup** index (~85K rows, ~800MB) for deduplicated search
+- Added **NKP** and **NAI** keyword fallbacks in QUERY_CLASSIFIERS for better topic routing
+- Added `slack-search-mcp` and `web-search-filtered` MCP servers for NX_Shield fallback queries
+
+### 2026-05-03
+- Added `expand_for_rerank` fix using PyArrow iteration — reduced latency from 54s to 3-4s
+- Added pre-filtering logic updates
+
+### 2026-04-27
+- Refactored pipeline to single hybrid search (was per-topic parallel search)
+- Fixed `expand_for_rerank` deadlock issue
+- Updated GEMMA_TIMEOUT from 10s to 3s
