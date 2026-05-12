@@ -255,3 +255,19 @@ async def global_exception_handler(request, exc):
   import traceback
   return JSONResponse(content={"error": str(exc), "trace": traceback.format_exc()[-500:]}, status_code=500)
 ```
+---
+
+## Changelog
+
+### 2026-05-12
+- Updated LanceDB table name: `nutanix_rag_v3.lance` → `nutanix_rag_v3_dedup.lance`
+- Added Kuzu graph DB integration for entity-based boosting
+- Updated row count: ~130K → ~85K (deduplicated)
+- Added Graph Boost section explaining entity matching with Kuzu
+- Added database paths for both LanceDB and Kuzu
+
+### 2026-05-05
+- Initial MCP server setup documentation
+- Dual MCP servers (Sam port 8004, NX_Shield port 8001)
+- launchd service configuration
+- Troubleshooting guide for Starlette ASGI issue
