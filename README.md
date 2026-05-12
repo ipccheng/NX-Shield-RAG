@@ -89,7 +89,12 @@ MCP server architecture and setup — covers the dual-instance MCP design (Sam v
 
 **Best for:** Understanding how OpenClaw agents connect to the RAG search pipeline via MCP, and how to rebuild the MCP infrastructure from scratch.
 
-### 👉 5. [HINDSIGHT SETUP](./HINDSIGHT_SETUP.md)
+### 👉 5. [GRAPH DB](./GRAPH_DB.md)
+Kuzu embedded graph database — covers entity relationships, graph schema, building the graph from LanceDB, query patterns, and graph boost integration.
+
+**Best for:** Understanding how the graph layer enhances vector search with relationship-aware retrieval.
+
+### 👉 6. [HINDSIGHT SETUP](./HINDSIGHT_SETUP.md)
 Hindsight app setup and operations — covers Docker Compose architecture (Hindsight + Postgres), backup and restore procedures, environment configuration, and operational notes.
 
 **Best for:** Operating and maintaining the Hindsight long-term memory system.
@@ -125,5 +130,6 @@ Hindsight app setup and operations — covers Docker Compose architecture (Hinds
 | `EMBED_PIPELINE.md` | Ingestion pipeline documentation |
 | `METADATA_SCHEMA.md` | Metadata schema design guide |
 | `MCP_SETUP.md` | MCP server architecture |
+| `GRAPH_DB.md` | Kuzu graph database guide |
 | `HINDSIGHT_SETUP.md` | Hindsight memory system setup |
 | `RAG_Pipeline_Diagram.png` | Architecture diagram |
