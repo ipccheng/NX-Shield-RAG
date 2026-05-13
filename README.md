@@ -106,6 +106,11 @@ Hindsight app setup and operations — covers Docker Compose architecture (Hinds
 
 **Best for:** Operating and maintaining the Hindsight long-term memory system.
 
+### 👉 6. [GRAPH DB](./GRAPH_DB.md)
+Kuzu graph database schema, entity extraction, relationship types, and query patterns — covers how entity co-occurrence walks are used to boost RAG retrieval with structural graph signals.
+
+**Best for:** Understanding how Kuzu fits into the query pipeline, what entity types are stored, and how to write graph queries for debugging or extending the boost logic.
+
 ---
 
 ## Quick Reference
