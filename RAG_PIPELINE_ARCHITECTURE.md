@@ -43,9 +43,13 @@ QUERY INTERFACE
 +-- Sam: direct Python exec run_search()
 +-- NX_Shield: gateway-mcp (port 8010) -> master_search tool
 |   |
-|   +-- Tier 1: RAG (nutanix_rag_search.py)
-|   +-- Tier 2: Slack (slk CLI)
-|   +-- Tier 3: Web (SearXNG on port 8888)
+|   +-- nx_gateway_mcp.py (thin SSE bridge — no waterfall logic)
+|   +-- nutanix_rag_search.py (universal search engine — all tiers below)
+|       |
+|       +-- Tier 1: RAG (LanceDB semantic search)
+|       +-- Tier 1.5: Ripgrep (local source files, parallel with RAG)
+|       +-- Tier 2: Slack (slk CLI fallback)
+|       +-- Tier 3: Web (SearXNG fallback)
 |
 v
 run_search() [7-stage pipeline]
@@ -59,11 +63,17 @@ run_search() [7-stage pipeline]
 +-- Stage 7: format_results() -> LLM-readable output
 ```
 
-### Key Architecture Change (2026-05-13)
+### Architecture Change (2026-05-13)
 
-**Before:** NX_Shield called `rag-mcp-server__query_nutanix_docs` directly. The LLM could bypass RAG and call `web-search-filtered` or `slack-search-mcp` directly, violating the intended fallback chain.
+**Two-component design:**
 
-**After:** NX_Shield calls a single tool — `gateway-mcp__master_search`. This gateway enforces a strict 3-tier waterfall internally (RAG → Slack → Web) in code. The LLM has no direct access to individual search tools.
+1. **`nutanix_rag_search.py` — Universal Search Engine**
+   All waterfall logic lives here: RAG (Tier 1), Ripgrep (Tier 1.5), Slack (Tier 2), Web (Tier 3). Any bot, CLI tool, or script calls this one Python file and gets the full fallback sequence. No tool overhead.
+
+2. **`nx_gateway_mcp.py` — Ultra-Thin SSE Bridge (NX_Shield only)**
+   Receives HTTP/SSE from OpenClaw, extracts the query, calls `nutanix_rag_search.py`, returns `TextContent`. Contains zero fallback logic — purely an HTTP adapter.
+
+**Why:** Any future agent (Sam on Mac mini, Neo on MacBook, a CLI script, a cron job) can call `nutanix_rag_search.py` directly and get the full engineered waterfall. The gateway is NX_Shield-specific plumbing.
 
 ### LanceDB Table (nutanix_rag_v3)
 
@@ -224,25 +234,48 @@ Same signal structure as before, but topics from DeepSeek classification are use
 
 ---
 
-## Gateway MCP — Enforced Waterfall
+## Gateway MCP — Thin Bridge + Universal Search Engine
 
-NX_Shield queries go through a single mandatory tool: `gateway-mcp__master_search`. This enforces the search waterfall in code, preventing the LLM from bypassing RAG or skipping fallbacks.
+NX_Shield queries go through a single mandatory tool: `gateway-mcp__master_search`.
 
-### Tier Architecture
+### Two Components
+
+**`nx_gateway_mcp.py` (port 8010) — Thin SSE Bridge**
+Receives HTTP/SSE from OpenClaw. Extracts the query string. Calls `nutanix_rag_search.py` as a subprocess. Takes the stdout and wraps it in an MCP `TextContent` payload. Zero fallback logic lives here — it is purely an HTTP adapter.
+
+**`nutanix_rag_search.py` — Universal Search Engine**
+All waterfall logic lives in one script, callable by any agent or CLI:
 
 ```
-gateway-mcp__master_search (port 8010)
-│
-├─ Tier 1: RAG (nutanix_rag_search.py)
-│   └─ nutanix_rag_v3 LanceDB + hybrid search
-│   └─ Returns results if CE score >= 0.1
-│
-├─ Tier 2: Slack (slk CLI)
-│   └─ Only if Tier 1 returns "No results found"
-│
-└─ Tier 3: Web (SearXNG port 8888)
-    └─ Only if Tier 1 AND Tier 2 both fail
+nutanix_rag_search.py [options] <query> [limit]
+
+Options:
+  --rerank-top N      Number of results to return (default: 50)
+  --identity NAME     Agent identity: sam | nx_shield (default: nx_shield)
+  --no-slack-search   Skip Slack fallback
+  --no-web-search     Skip Web (SearXNG) fallback
 ```
+
+All tiers fire sequentially: RAG → Ripgrep → Slack → Web. Low-confidence RAG results also trigger Slack/Web fallbacks automatically.
+
+### Waterfall Logic (in nutanix_rag_search.py)
+
+```
+Tier 1:   RAG (LanceDB semantic search, CE score >= 0.1)
+Tier 1.5: Ripgrep (local .md/.txt/.html files, parallel with RAG)
+Tier 2:   Slack (slk CLI — only if Tier 1+1.5 return nothing or low confidence)
+Tier 3:   Web (SearXNG — only if Tier 1+1.5+2 all fail)
+```
+
+### Multi-Host Configuration (env vars)
+
+`nutanix_rag_search.py` reads paths/URLs from environment variables so the same script works on Mac mini (Sam/NX_Shield) and MacBook (Neo):
+
+| Env Variable | Default | Notes |
+|---|---|---|
+| `KUZU_DB_PATH` | `~/.openclaw/memory/kuzu-pro/nutanix_graph_v3` | Kuzu graph DB |
+| `SEARXNG_URL` | `http://127.0.0.1:8888/search` | Neo overrides with its local SearXNG |
+| `RAG_DOCS_DIR` | `~/.openclaw/workspace/rag/nutanix` | Ripgrep search root |
 
 ### Gateway Tool Constraints
 
@@ -268,7 +301,7 @@ This ensures the waterfall is architecturally enforced — not dependent on the 
 | Jina Embed API | Cloud (api.jina.ai) | Vectorization |
 | Jina Rerank API | Cloud (api.jina.ai) | Semantic reranking |
 | OpenClaw gateway | Host | Agent orchestration |
-| SearXNG | Host (port 8888) | Web search (Tier 3 fallback) |
+| SearXNG | Host (Mac mini + Neo MacBook) | Web search (Tier 3 fallback); configurable via `SEARXNG_URL` env var |
 | Slack (slk CLI) | Host | Tier 2 fallback |
 
 ---
@@ -336,11 +369,13 @@ The OpenClaw backup script keeps **14 days** of snapshots on T7. The LanceDB tab
 ## Changelog
 
 ### 2026-05-13
-- **ARCHITECTURE OVERHAUL**: NX_Shield now calls single `gateway-mcp__master_search` tool (port 8010) instead of individual MCP tools
-- **Gateway MCP** (`nx_gateway_mcp.py`) created — enforces strict RAG → Slack → Web waterfall in code
+- **TWO-COMPONENT SPLIT**: `nutanix_rag_search.py` = universal engine (all tiers); `nx_gateway_mcp.py` = thin SSE bridge (zero fallback logic)
+- **Universal engine**: All waterfall logic (RAG + Ripgrep + Slack + Web) now in one Python script — any agent/CLI can call it directly
+- **Parallel Tier 1**: RAG (LanceDB) and Ripgrep now fire simultaneously; results are combined for richer context
+- **Environment-configurable paths**: `KUZU_DB_PATH`, `SEARXNG_URL`, `RAG_DOCS_DIR` allow the same script to run on Mac mini (Sam/NX_Shield) or Neo MacBook
+- **Gateway MCP** (`nx_gateway_mcp.py`) is now an ultra-thin SSE bridge — receives OpenClaw HTTP request, calls `nutanix_rag_search.py`, returns `TextContent`
 - **LLM tool allowlist stripped**: Removed direct access to `rag-mcp-server__query_nutanix_docs`, `slack-search-mcp__slack_search`, `web-search-filtered__web_search_filtered` from NX_Shield
-- **Web search**: Replaced external search API with local **SearXNG** (port 8888) — no external API dependency for Tier 3
-- **Slack search**: `slack-search-mcp` LaunchAgent deleted, `slk` CLI called directly by gateway
+- **Web search**: SearXNG (port 8888) — configurable per host via `SEARXNG_URL` env var
 - **Old MCP services decommissioned**: `rag-mcp-server` (port 8001), `slack-search-mcp` (port 8005) LaunchAgents removed from launchd
 
 ### 2026-05-12
