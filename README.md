@@ -30,7 +30,7 @@ in the graph → boosts chunks whose metadata mentions those entities.
 |--------|----------------------|------------------------------|
 | **Entity discovery** | Metadata tags only | Graph traversal finds related entities |
 | **Boost mechanism** | Semantic similarity only | +0.15 RRF score for graph-verified chunks |
-| **Entity coverage** | Static metadata | Graph discovers隐式 connections (e.g. "NAI"→"Nutanix_AI" via RELATED_TO) |
+| **Entity coverage** | Static metadata | Graph discovers implicit connections (e.g. "NAI"→"Nutanix_AI" via RELATED_TO) |
 | **Query latency** | ~6–8s | ~6–8s (Kuzu walks run in parallel with embedding) |
 | **Storage** | ~1.2 GB LanceDB | + ~100 MB Kuzu DB |
 | **Graph size** | N/A | 48,483 entities / 334,800 edges |
