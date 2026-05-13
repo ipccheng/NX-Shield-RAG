@@ -147,5 +147,6 @@ Kuzu graph database schema, entity extraction, relationship types, and query pat
 | `EMBED_PIPELINE.md` | Ingestion pipeline documentation |
 | `METADATA_SCHEMA.md` | Metadata schema design guide |
 | `MCP_SETUP.md` | MCP server architecture |
+| `GRAPH_DB.md` | Kuzu graph DB schema, entity extraction, and query patterns |
 | `HINDSIGHT_SETUP.md` | Hindsight memory system setup |
 | `RAG_Pipeline_Diagram.png` | Architecture diagram |
