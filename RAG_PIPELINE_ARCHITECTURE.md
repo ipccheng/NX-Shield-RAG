@@ -1,6 +1,6 @@
 # NX_Shield RAG Pipeline — Architecture & Documentation
 
-> **Last updated:** 2026-05-03
+> **Last updated:** 2026-05-13
 > **Status:** Active
 
 ---
@@ -41,22 +41,29 @@ v
 QUERY INTERFACE
 |
 +-- Sam: direct Python exec run_search()
-+-- NX_Shield: MCP protocol via mcp_server.py (port 8001 with identity=nx_shield)
++-- NX_Shield: gateway-mcp (port 8010) -> master_search tool
+|   |
+|   +-- Tier 1: RAG (nutanix_rag_search.py)
+|   +-- Tier 2: Slack (slk CLI)
+|   +-- Tier 3: Web (SearXNG on port 8888)
 |
 v
-run_search() [5-stage pipeline]
+run_search() [7-stage pipeline]
 |
 +-- Stage 1: Intent detection + filter construction (keyword + entities)
 +-- Stage 2: Jina embed (api.jina.ai, 1024-dim)
 +-- Stage 3: LanceDB hybrid search (vector + FTS + RRF with dynamic filters)
 +-- Stage 4: expand_for_rerank (±2 neighbor context via PyArrow)
 +-- Stage 5: Jina cross-encoder rerank (top 30 → top 5)
-+-- Stage 6: score_multiplier() + subcategory/product boost from Gemma topics
++-- Stage 6: score_multiplier() + subcategory/product boost from DeepSeek topics
 +-- Stage 7: format_results() -> LLM-readable output
-|
-v
-format_results() -> LLM-readable output
 ```
+
+### Key Architecture Change (2026-05-13)
+
+**Before:** NX_Shield called `rag-mcp-server__query_nutanix_docs` directly. The LLM could bypass RAG and call `web-search-filtered` or `slack-search-mcp` directly, violating the intended fallback chain.
+
+**After:** NX_Shield calls a single tool — `gateway-mcp__master_search`. This gateway enforces a strict 3-tier waterfall internally (RAG → Slack → Web) in code. The LLM has no direct access to individual search tools.
 
 ### LanceDB Table (nutanix_rag_v3)
 
@@ -87,10 +94,10 @@ format_results() -> LLM-readable output
 
 ### Query Paths
 
-| Agent | Method | MCP Server | Identity |
+| Agent | Method | Tool | Notes |
 |---|---|---|---|
-| Sam | Direct Python exec | `rag-mcp-server-sam` (port 8004) | unrestricted |
-| NX_Shield | MCP protocol | `rag-mcp-server` (port 8001) | `nx_shield` (public-only) |
+| Sam | Direct Python exec | `run_search()` | Full access (internal + public) |
+| NX_Shield | Single tool call | `gateway-mcp__master_search` | Enforces RAG → Slack → Web waterfall |
 
 ### Pipeline Overview
 
@@ -104,7 +111,7 @@ format_results() -> LLM-readable output
 | 6 | Score multiplier + confidence filter | CE scores | boosted scores | ~0.01s |
 | 7 | format_results() | boosted scores | formatted output | ~0.01s |
 
-**Total pipeline latency:** ~6-8s per query (warm) — down from ~60s after expand_for_rerank fix
+**Total pipeline latency:** ~6-8s per query (warm)
 
 ---
 
@@ -175,7 +182,7 @@ results = rrf_merge([vector_r, fts_r], k=60)
 
 **Key advantage:** No per-topic keyword dictionary to maintain. No search strings to guess. The embedding handles query semantics, filters handle metadata routing.
 
-**Gemma topic classification** still runs in parallel but is used ONLY for `score_multiplier()` boosting (not search routing). This means if Gemma times out or the endpoint is unreachable, search still works perfectly — only the scoring boost is lost.
+**DeepSeek topic classification** runs in parallel but is used ONLY for `score_multiplier()` boosting (not search routing). This means if DeepSeek times out or the endpoint is unreachable, search still works perfectly — only the scoring boost is lost.
 
 ---
 
@@ -195,7 +202,7 @@ Same as before — Jina's hosted listwise reranker scores semantic relevance. Fa
 
 ### Stage 6 — Score Multiplier (`score_multiplier`)
 
-Same signal structure as before, but topics from Gemma classification are used as a **secondary scoring signal**, not primary routing. If Gemma is offline, the multiplier defaults to 1.0 (no boost), but search still works.
+Same signal structure as before, but topics from DeepSeek classification are used as a **secondary scoring signal**, not primary routing. If DeepSeek is offline, the multiplier defaults to 1.0 (no boost), but search still works.
 
 **Three boost signals:**
 
@@ -217,26 +224,52 @@ Same signal structure as before, but topics from Gemma classification are used a
 
 ---
 
+## Gateway MCP — Enforced Waterfall
+
+NX_Shield queries go through a single mandatory tool: `gateway-mcp__master_search`. This enforces the search waterfall in code, preventing the LLM from bypassing RAG or skipping fallbacks.
+
+### Tier Architecture
+
+```
+gateway-mcp__master_search (port 8010)
+│
+├─ Tier 1: RAG (nutanix_rag_search.py)
+│   └─ nutanix_rag_v3 LanceDB + hybrid search
+│   └─ Returns results if CE score >= 0.1
+│
+├─ Tier 2: Slack (slk CLI)
+│   └─ Only if Tier 1 returns "No results found"
+│
+└─ Tier 3: Web (SearXNG port 8888)
+    └─ Only if Tier 1 AND Tier 2 both fail
+```
+
+### Gateway Tool Constraints
+
+NX_Shield's tool allowlist was updated to remove all individual search tools:
+
+| Removed (no longer callable by NX_Shield) | Still available |
+|---|---|
+| `rag-mcp-server__query_nutanix_docs` | `gateway-mcp__master_search` (only) |
+| `slack-search-mcp__slack_search` | `memory_recall` / `memory_store` |
+| `web-search-filtered__web_search_filtered` | `storage_calc_*` tools |
+| | `read`, `sessions_list`, `sessions_history` |
+
+This ensures the waterfall is architecturally enforced — not dependent on the LLM following prompt rules.
+
+---
+
 ## Runtime Infrastructure
 
 | Component | Host | Notes |
 |---|---|---|
 | LanceDB + search | Primary runtime | nutanix_rag_v3 table |
-| Gemma 4 31B | Remote endpoint | Topic scoring only |
+| DeepSeek | Remote endpoint | Topic scoring only |
 | Jina Embed API | Cloud (api.jina.ai) | Vectorization |
 | Jina Rerank API | Cloud (api.jina.ai) | Semantic reranking |
 | OpenClaw gateway | Host | Agent orchestration |
-
-### MCP Server Architecture (Dual-Instance)
-
-Two separate RAG MCP server instances provide identity-based access control:
-
-| Server | Port | Identity | Used By |
-|---|---|---|---|
-| `rag-mcp-server` | 8001 | `nx_shield` | NX_Shield (public only) |
-| `rag-mcp-server-sam` | 8004 | `sam` (default) | Sam (full access) |
-
-The identity is passed via `NX_AGENT_IDENTITY` env var (managed by launchd) and read at query time by `build_search_filters()`. NX_Shield can never retrieve `access_level='internal'` docs regardless of query or filter parameters.
+| SearXNG | Host (port 8888) | Web search (Tier 3 fallback) |
+| Slack (slk CLI) | Host | Tier 2 fallback |
 
 ---
 
@@ -298,10 +331,17 @@ This restores `.openclaw/` to `/Users/ipccheng/.openclaw/`, including the LanceD
 
 The OpenClaw backup script keeps **14 days** of snapshots on T7. The LanceDB table grows slowly with new content, so this is sufficient for recovery.
 
-
 ---
 
 ## Changelog
+
+### 2026-05-13
+- **ARCHITECTURE OVERHAUL**: NX_Shield now calls single `gateway-mcp__master_search` tool (port 8010) instead of individual MCP tools
+- **Gateway MCP** (`nx_gateway_mcp.py`) created — enforces strict RAG → Slack → Web waterfall in code
+- **LLM tool allowlist stripped**: Removed direct access to `rag-mcp-server__query_nutanix_docs`, `slack-search-mcp__slack_search`, `web-search-filtered__web_search_filtered` from NX_Shield
+- **Web search**: Replaced external search API with local **SearXNG** (port 8888) — no external API dependency for Tier 3
+- **Slack search**: `slack-search-mcp` LaunchAgent deleted, `slk` CLI called directly by gateway
+- **Old MCP services decommissioned**: `rag-mcp-server` (port 8001), `slack-search-mcp` (port 8005) LaunchAgents removed from launchd
 
 ### 2026-05-12
 - Replaced **Gemma** with **DeepSeek** for topic classification
