@@ -1119,8 +1119,12 @@ def run_search(query: str, limit: int = 5, fetch_n: int = 100, rrf_k: int = 60, 
     return final_results
 
 
-def format_results(results: list, query: str, enable_slack: bool = True, enable_web: bool = True) -> str:
-    if not results:
+def format_results(rag_results: list, rg_text: str, query: str, enable_slack: bool = True, enable_web: bool = True) -> str:
+    # Evaluate RAG confidence
+    low_confidence = all(r.get("_ce_score", 0) < 0.10 for r in rag_results) if rag_results else True
+
+    # If BOTH Ripgrep and RAG failed (or RAG is garbage), trigger the waterfall
+    if not rg_text and (not rag_results or low_confidence):
         # Tier 2: Slack fallback
         if enable_slack:
             slack_result = query_slack_fallback(query)
@@ -1133,28 +1137,23 @@ def format_results(results: list, query: str, enable_slack: bool = True, enable_
                 return web_result
         return "No results found."
 
-    # Check if ALL results have low confidence
-    low_confidence = all(r.get("_ce_score", 0) < 0.10 for r in results)
-    if low_confidence:
-        # RAG results are weak — try Slack
-        if enable_slack:
-            slack_result = query_slack_fallback(query)
-            if not slack_result.startswith("No results found"):
-                return slack_result
-        # Slack also weak/nothing — try Web
-        if enable_web:
-            web_result = query_web_search(query)
-            if not web_result.startswith("No results found"):
-                return web_result
+    # Tier 1 & 1.5 Succeeded: Combine the results
+    lines = [f"Query: {query}"]
 
-    lines = [f"Query: {query}", "", f"Top {len(results)} results:"]
-    for i, r in enumerate(results, 1):
-        src = r.get("source", "unknown")
-        txt = r.get("text", "").replace("&#xA0;", " ").replace("&amp;", "&").replace("\n", " ").strip()
-        graph_tag = " [GRAPH]" if r.get("_graph_verified") else ""
-        lines.append(f"\n[{i}] {src}{graph_tag}")
-        lines.append(f"    ce={r.get('_ce_score',0):.3f} × {r.get('_multiplier',1):.2f} = {r.get('_score',0):.3f}")
-        lines.append(f"    {txt[:600]}...")
+    if rg_text:
+        lines.append("\n[SOURCE: EXACT KEYWORD MATCHES (Tier 1.5 - Local File Ripgrep)]")
+        lines.append(rg_text)
+
+    if rag_results and not low_confidence:
+        lines.append(f"\n[SOURCE: SEMANTIC CONTEXT (Tier 1 - LanceDB Top {len(rag_results)})]")
+        for i, r in enumerate(rag_results, 1):
+            src = r.get("source", "unknown")
+            txt = r.get("text", "").replace("&#xA0;", " ").replace("&amp;", "&").replace("\n", " ").strip()
+            graph_tag = " [GRAPH]" if r.get("_graph_verified") else ""
+            lines.append(f"\n[{i}] {src}{graph_tag}")
+            lines.append(f"    ce={r.get('_ce_score',0):.3f} × {r.get('_multiplier',1):.2f} = {r.get('_score',0):.3f}")
+            lines.append(f"    {txt[:600]}...")
+
     return "\n".join(lines)
 
 
@@ -1222,8 +1221,29 @@ def query_web_search(query: str) -> str:
         return f"No results found.\n\n(Web search error: {str(e)[:100]})"
 
 
+def query_ripgrep(query: str) -> str:
+    """Tier 1.5: Lexical exact-match search using ripgrep (parallel with RAG)."""
+    if not RAG_DOCS_DIR.exists():
+        return ""
+    try:
+        rg_proc = subprocess.run(
+            ["/opt/homebrew/bin/rg", "-F", "-n", "-i", "--", query, str(RAG_DOCS_DIR)],
+            capture_output=True, text=True, timeout=15
+        )
+        if rg_proc.returncode == 0 and rg_proc.stdout.strip():
+            lines = rg_proc.stdout.strip().split("\n")[:15]
+            # Truncate lines to prevent context window blowout
+            trimmed = [line[:250] + "..." if len(line) > 250 else line for line in lines]
+            return "\n".join(trimmed)
+    except Exception as e:
+        print(f"Ripgrep Error: {e}", file=sys.stderr)
+    return ""
+
+
 def main():
     import argparse
+    import concurrent.futures
+
     parser = argparse.ArgumentParser(description="Universal Nutanix RAG search engine with fallback waterfall.")
     parser.add_argument("--rerank-top", type=int, default=50)
     parser.add_argument("--identity", type=str,
@@ -1235,11 +1255,25 @@ def main():
     parser.add_argument("query", type=str)
     parser.add_argument("limit", type=int, nargs="?", default=5)
     args = parser.parse_args()
+
     identity = (args.identity or NX_AGENT_IDENTITY).strip().lower()
-    results = run_search(args.query, args.limit, rerank_top=args.rerank_top, identity=identity)
+
+    # ── PARALLEL TIER 1 EXECUTION ──
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        rag_future = executor.submit(run_search, args.query, args.limit, rerank_top=args.rerank_top, identity=identity)
+        rg_future = executor.submit(query_ripgrep, args.query)
+
+        # Wait for both to finish
+        rag_results = rag_future.result()
+        rg_text = rg_future.result()
+
     print(file=sys.stderr)
+
+    # ── FORMAT & FALLBACK WATERFALL ──
     print(format_results(
-        results, args.query,
+        rag_results=rag_results,
+        rg_text=rg_text,
+        query=args.query,
         enable_slack=not args.no_slack_search,
         enable_web=not args.no_web_search
     ))
