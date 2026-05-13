@@ -6,25 +6,44 @@ A Retrieval-Augmented Generation (RAG) knowledge base for Nutanix technical supp
 
 ## Kuzu Graph Boost — Before vs After
 
-Kuzu graph database adds relationship-aware retrieval by linking related document chunks. This captures multi-hop context that flat vector-only search misses.
+Kuzu is a read-only graph layer that adds **structural entity verification** to vector search. It does not replace vector retrieval — it sits alongside it, confirming that a chunk's tagged entities are genuinely connected to the query topic through the document knowledge graph.
 
 ```
 Query: "NKP edition needed for NAI"
 ```
 
+**Kuzu graph topology (48,483 entities, 334,800 relationship edges):**
+
+```
+Chunk ──HAS_RELATIONSHIP──► Entity (e.g. "NAI", "NKP_EDITION")
+  │                              ▲
+  │                              │
+  └───(via chunk_hash)      RELATED_TO
+                              │
+                        Entity (e.g. "Nutanix_AI")
+
+When query contains "NAI", Kuzu finds all entities connected to "NAI"
+in the graph → boosts chunks whose metadata mentions those entities.
+```
+
 | Metric | LanceDB Only (Before) | LanceDB + Kuzu Graph (After) |
-|--------|---------------------|--------------------------|
-| **Related chunks retrieved** | Top 30 | Top 30 + 273 neighbours |
-| **Context coverage** | Single chunks | Chunk + neighbors |
-| **Graph traversal** | None | +1 hop links |
-| **Storage** | ~1.2 GB | ~1.2 GB + graph |
-| **Query latency** | ~6-8s | ~6-8s |
+|--------|----------------------|------------------------------|
+| **Entity discovery** | Metadata tags only | Graph traversal finds related entities |
+| **Boost mechanism** | Semantic similarity only | +0.15 RRF score for graph-verified chunks |
+| **Entity coverage** | Static metadata | Graph discovers隐式 connections (e.g. "NAI"→"Nutanix_AI" via RELATED_TO) |
+| **Query latency** | ~6–8s | ~6–8s (Kuzu walks run in parallel with embedding) |
+| **Storage** | ~1.2 GB LanceDB | + ~100 MB Kuzu DB |
+| **Graph size** | N/A | 48,483 entities / 334,800 edges |
 
-### What Kuzu Adds
+### What Kuzu Actually Does
 
-- **Graph topology:** Links chunks that share the same source document
-- **Neighbor expansion:** Retrieves ±2 related chunks beyond the vector match
-- **Structural awareness:** Knows document relationships, not just semantic similarity
+Kuzu does **not** retrieve additional chunks. Its role is **score boosting**:
+
+1. **Graph walk:** Kuzu traverses `(Chunk)-[HAS_RELATIONSHIP]->(Entity)` for every query term, finding all entities connected to the query
+2. **Entity matching:** The returned entity names (e.g. `NAI`, `NKP_EDITION`, `Nutanix_AI`) are fuzzy-matched against each result chunk's `ecosystem_entities` and `mentioned_products` metadata
+3. **Score boost:** Chunks where tagged entities overlap with Kuzu's graph-verified entities receive +0.15 to their RRF score — structural confirmation baked into the ranking
+
+The key advantage: **graph discovers implicit relationships that pure metadata cannot capture.** A chunk about "NAI" might not explicitly mention "Nutanix AI" — but the graph knows they're the same entity via `RELATED_TO` edges, and boosts it accordingly.
 
 ---
 
@@ -72,7 +91,7 @@ Without retrieval, the model "hallucinates context" into existence — burning 7
 ## Documents
 
 ### 👉 1. [RAG PIPELINE ARCHITECTURE](./RAG_PIPELINE_ARCHITECTURE.md)
-Full pipeline documentation — covers the query processing flow, LanceDB schema, intent-based dynamic filter routing, entity extraction, cross-encoder reranking, score multipliers, confidence thresholds, MCP server integration, and LanceDB backup.
+Full pipeline documentation — covers the query processing flow, LanceDB schema, intent-based dynamic filter routing, entity extraction, cross-encoder reranking, score multipliers, confidence thresholds, the Gateway MCP enforced waterfall, and LanceDB backup.
 
 **Best for:** Understanding how a query moves from user input to formatted response.
 
@@ -87,7 +106,7 @@ Metadata schema design and structure — covers the 7 metadata fields (access_le
 **Best for:** Understanding how documents are tagged, why the schema was redesigned, and how metadata powers search accuracy.
 
 ### 👉 4. [MCP SETUP](./MCP_SETUP.md)
-MCP server architecture and setup — covers the dual-instance MCP design (Sam vs NX_Shield), how tool naming works, the `--identity` flag, launchd service configuration, and troubleshooting steps.
+MCP server architecture and setup — covers the Gateway MCP design (port 8010), tool naming conventions, the `--identity` flag, launchd service configuration, and troubleshooting steps.
 
 **Best for:** Understanding how OpenClaw agents connect to the RAG search pipeline via MCP, and how to rebuild the MCP infrastructure from scratch.
 
@@ -108,7 +127,7 @@ Hindsight app setup and operations — covers Docker Compose architecture (Hinds
 | Component | Detail |
 |---|---|
 | Vector DB | LanceDB (`nutanix_rag_v3` — ~1.2 GB) |
-| Graph DB | Kuzu (`nutanix_rag_v3_dedup` — ~800MB) |
+| Graph DB | Kuzu (`nutanix_graph_v3` — 48,483 entities, 334,800 edges) |
 | Embedding | Jina AI `jina-embeddings-v5-text-small` (1024 dims) |
 | Classifier | DeepSeek (for topic-based scoring boost) |
 | Intent Routing | Keyword + entity-based dynamic filter construction |
@@ -119,6 +138,7 @@ Hindsight app setup and operations — covers Docker Compose architecture (Hinds
 | DB size | **129,732 chunks** / ~1.2 GB |
 | Query latency | ~6–8s (warm) |
 | Pipeline | 7-stage: intent routing → embed → search → expand → rerank → score → format |
+| Gateway | `gateway-mcp__master_search` (port 8010) — enforces RAG → Slack → Web waterfall |
 | Agents | Sam, NX_Shield (Discord bot) |
 
 ---
