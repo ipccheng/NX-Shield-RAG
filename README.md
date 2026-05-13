@@ -75,7 +75,7 @@ See [GRAPH_DB.md](./GRAPH_DB.md) for full schema, entity extraction, and query p
 
 ## Architecture
 
-![NX_Shield RAG Pipeline Architecture](https://github.com/ipccheng/rag-pipeline/blob/main/RAG%20Pipeline%20Diagram.png)
+![NX_Shield RAG Pipeline Architecture](https://github.com/ipccheng/rag-pipeline/blob/main/RAG%20v3%20Pipeline%20Diagram.png)
 
 ---
 
