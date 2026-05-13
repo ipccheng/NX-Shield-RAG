@@ -1,0 +1,7 @@
+{
+  "max_calls_per_session": {
+    "nutanix_shield": 2,
+    "sam": 3,
+    "default": 1
+  }
+}

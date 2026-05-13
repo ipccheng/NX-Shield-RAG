@@ -238,10 +238,22 @@ Same signal structure as before, but topics from DeepSeek classification are use
 
 NX_Shield queries go through a single mandatory tool: `gateway-mcp__master_search`.
 
+### Per-Agent Call Limits (max_calls)
+
+Each agent has a **max_calls** limit enforced server-side by the gateway — not by the LLM:
+
+| Agent | max_calls | Notes |
+|---|---|---|
+| `nutanix_shield` | 2 | NX_Shield Discord bot |
+| `sam` | 3 | Mac mini main session |
+| `default` | 1 | Any unknown session |
+
+**How it works:** The gateway builds a session→agent map at startup by scanning `~/.openclaw/agents/*/sessions/*.jsonl`. When a tool call arrives, the session ID is looked up to identify the agent, and the call counter for that session is incremented. If the limit is exceeded, the gateway returns `MAX_CALLS_EXCEEDED` — no further calls are accepted.
+
 ### Two Components
 
 **`nx_gateway_mcp.py` (port 8010) — Thin SSE Bridge**
-Receives HTTP/SSE from OpenClaw. Extracts the query string. Calls `nutanix_rag_search.py` as a subprocess. Takes the stdout and wraps it in an MCP `TextContent` payload. Zero fallback logic lives here — it is purely an HTTP adapter.
+Receives HTTP/SSE from OpenClaw. Extracts the query string. Calls `nutanix_rag_search.py` as a subprocess. Takes the stdout and wraps it in an MCP `TextContent` payload. Zero fallback logic — purely an HTTP adapter. Also enforces per-agent call limits.
 
 **`nutanix_rag_search.py` — Universal Search Engine**
 All waterfall logic lives in one script, callable by any agent or CLI:
@@ -256,16 +268,32 @@ Options:
   --no-web-search     Skip Web (SearXNG) fallback
 ```
 
-All tiers fire sequentially: RAG → Ripgrep → Slack → Web. Low-confidence RAG results also trigger Slack/Web fallbacks automatically.
+**Tier execution:** Tier 1 (RAG) and Tier 1.5 (Ripgrep) fire in parallel via `ThreadPoolExecutor`. Tiers 2 and 3 are sequential fallbacks.
 
 ### Waterfall Logic (in nutanix_rag_search.py)
 
 ```
 Tier 1:   RAG (LanceDB semantic search, CE score >= 0.1)
-Tier 1.5: Ripgrep (local .md/.txt/.html files, parallel with RAG)
+Tier 1.5: Ripgrep (local .md/.txt/.html files, parallel with Tier 1)
 Tier 2:   Slack (slk CLI — only if Tier 1+1.5 return nothing or low confidence)
 Tier 3:   Web (SearXNG — only if Tier 1+1.5+2 all fail)
 ```
+
+### Gateway Configuration File
+
+Per-agent call limits are defined in `gateway_config.json`, loaded at gateway startup:
+
+```json
+{
+  "max_calls_per_session": {
+    "nutanix_shield": 2,
+    "sam": 3,
+    "default": 1
+  }
+}
+```
+
+The config path is: `~/.openclaw/workspace/scripts/gateway_config.json`
 
 ### Multi-Host Configuration (env vars)
 
@@ -371,12 +399,14 @@ The OpenClaw backup script keeps **14 days** of snapshots on T7. The LanceDB tab
 ### 2026-05-13
 - **TWO-COMPONENT SPLIT**: `nutanix_rag_search.py` = universal engine (all tiers); `nx_gateway_mcp.py` = thin SSE bridge (zero fallback logic)
 - **Universal engine**: All waterfall logic (RAG + Ripgrep + Slack + Web) now in one Python script — any agent/CLI can call it directly
-- **Parallel Tier 1**: RAG (LanceDB) and Ripgrep now fire simultaneously; results are combined for richer context
+- **Parallel Tier 1**: RAG (LanceDB) and Ripgrep now fire simultaneously via `ThreadPoolExecutor`; results are combined for richer context
 - **Environment-configurable paths**: `KUZU_DB_PATH`, `SEARXNG_URL`, `RAG_DOCS_DIR` allow the same script to run on Mac mini (Sam/NX_Shield) or Neo MacBook
 - **Gateway MCP** (`nx_gateway_mcp.py`) is now an ultra-thin SSE bridge — receives OpenClaw HTTP request, calls `nutanix_rag_search.py`, returns `TextContent`
 - **LLM tool allowlist stripped**: Removed direct access to `rag-mcp-server__query_nutanix_docs`, `slack-search-mcp__slack_search`, `web-search-filtered__web_search_filtered` from NX_Shield
 - **Web search**: SearXNG (port 8888) — configurable per host via `SEARXNG_URL` env var
 - **Old MCP services decommissioned**: `rag-mcp-server` (port 8001), `slack-search-mcp` (port 8005) LaunchAgents removed from launchd
+- **Per-agent call limits**: `gateway_config.json` enforces max_calls server-side (NX_Shield=2, Sam=3, default=1) — not LLM-dependent
+- **Session map**: gateway builds session→agent map at startup from `~/.openclaw/agents/*/sessions/*.jsonl` to identify calling agent
 
 ### 2026-05-12
 - Replaced **Gemma** with **DeepSeek** for topic classification

@@ -138,8 +138,10 @@ Hindsight app setup and operations — covers Docker Compose architecture (Hinds
 | DB size | **129,732 chunks** / ~1.2 GB |
 | Query latency | ~6–8s (warm) |
 | Pipeline | 7-stage: intent routing → embed → search → expand → rerank → score → format |
-| Gateway | `gateway-mcp__master_search` (port 8010) — enforces RAG → Slack → Web waterfall |
-| Agents | Sam, NX_Shield (Discord bot) |
+| Gateway | `gateway-mcp__master_search` (port 8010) — thin SSE bridge + universal search engine |
+| Tier 1 + 1.5 | RAG (LanceDB) + Ripgrep in parallel |
+| Per-agent max_calls | NX_Shield=2, Sam=3 (enforced server-side via `gateway_config.json`) |
+| Agents | Sam (Mac mini), NX_Shield (Discord bot) |
 
 ---
 
@@ -155,3 +157,6 @@ Hindsight app setup and operations — covers Docker Compose architecture (Hinds
 | `GRAPH_DB.md` | Kuzu graph database guide |
 | `HINDSIGHT_SETUP.md` | Hindsight memory system setup |
 | `RAG_Pipeline_Diagram.png` | Architecture diagram |
+| `gateway_config.json` | Per-agent max_calls limits (loaded by gateway at startup) |
+| `nutanix_rag_search.py` | Universal search engine — all waterfall tiers (RAG+Ripgrep+Slack+Web) |
+| `nx_gateway_mcp.py` | Ultra-thin SSE bridge for NX_Shield (gateway component) |
