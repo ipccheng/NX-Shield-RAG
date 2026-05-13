@@ -13,14 +13,27 @@ from pathlib import Path
 from config import DB_PATH, JINA_API_KEY, JINA_EMBED_URL, JINA_RERANK_URL, DEEPSEEK_API_KEY, DEEPSEEK_URL, DEEPSEEK_MODEL, DEEPSEEK_TIMEOUT
 
 # Tagged entity extraction (dynamic query-time)
-_TAGGER_PATH = Path(__file__).resolve().parent.parent.parent.parent / "rag" / "nutanix" / "pipeline"
+# Handle both Mac mini (~/.openclaw/workspace/scripts/) and MacBook (~/.openclaw/scripts/)
+_TAGGER_PATH = Path(__file__).resolve().parent
+# Try workspace-relative first
+_alt = _TAGGER_PATH.parent / "rag" / "nutanix" / "pipeline"
+if _alt.exists():
+    _TAGGER_PATH = _alt
 if str(_TAGGER_PATH) not in sys.path:
     sys.path.insert(0, str(_TAGGER_PATH))
 from tagger_v3 import extract_ecosystem_entities, extract_mentioned_products
 
 NX_MODEL_RE = re.compile(r'nx-\d{4}[a-z]?(-\w+)?-g10', re.IGNORECASE)
 
-KUZU_DB_PATH = os.path.expanduser("~/.openclaw/memory/kuzu-pro/nutanix_graph_v3")
+KUZU_DB_PATH = os.path.expanduser(
+    os.environ.get("KUZU_DB_PATH", "~/.openclaw/memory/kuzu-pro/nutanix_graph_v3")
+)
+SEARXNG_URL = os.environ.get(
+    "SEARXNG_URL",
+    "http://127.0.0.1:8888/search"
+)
+ALLOWED_DOMAINS_FILE = Path.home() / ".openclaw/workspace/scripts/allowed_domains.json"
+RAG_DOCS_DIR = Path.home() / ".openclaw/workspace/rag/nutanix"
 
 
 def get_graph_entities(query: str) -> dict:
@@ -599,7 +612,6 @@ QUERY_CLASSIFIERS = {
     # ── Storage Hardware ─────────────────────────────────────────────────────
     "NVMe": "STORAGE_NVME", "nvme": "STORAGE_NVME", "SSD HDD": "STORAGE_NVME", "mixed cluster": "STORAGE_NVME", "node expand": "STORAGE_NVME",
     "mixed cluster": "MIXED_CLUSTER", "nvme hdd": "MIXED_CLUSTER", "ssd hdd": "MIXED_CLUSTER", "hybrid": "MIXED_CLUSTER",
-    "gpu": "GPU_VGPU", "vgpu": "GPU_VGPU", "nvidia": "GPU_VGPU", "ai workload": "GPU_VGPU", "gpu profile": "GPU_VGPU",
     "L4": "HARDWARE_SPEC", "A16": "HARDWARE_SPEC", "L40S": "HARDWARE_SPEC", "RTX Pro": "HARDWARE_SPEC",
     # ── Imaging & Firmware ───────────────────────────────────────────────────
     "Foundation": "FOUNDATION_IMAGING", "foundation": "FOUNDATION_IMAGING", "host imaging": "FOUNDATION_IMAGING",
@@ -1107,33 +1119,164 @@ def run_search(query: str, limit: int = 5, fetch_n: int = 100, rrf_k: int = 60, 
     return final_results
 
 
-def format_results(results: list, query: str) -> str:
-    if not results:
+def format_results(rag_results: list, rg_text: str, query: str, enable_slack: bool = True, enable_web: bool = True) -> str:
+    # Evaluate RAG confidence
+    low_confidence = all(r.get("_ce_score", 0) < 0.10 for r in rag_results) if rag_results else True
+
+    # If BOTH Ripgrep and RAG failed (or RAG is garbage), trigger the waterfall
+    if not rg_text and (not rag_results or low_confidence):
+        # Tier 2: Slack fallback
+        if enable_slack:
+            slack_result = query_slack_fallback(query)
+            if not slack_result.startswith("No results found"):
+                return slack_result
+        # Tier 3: Web fallback
+        if enable_web:
+            web_result = query_web_search(query)
+            if not web_result.startswith("No results found"):
+                return web_result
         return "No results found."
-    lines = [f"Query: {query}", "", f"Top {len(results)} results:"]
-    for i, r in enumerate(results, 1):
-        src = r.get("source", "unknown")
-        txt = r.get("text", "").replace("&#xA0;", " ").replace("&amp;", "&").replace("\n", " ").strip()
-        graph_tag = " [GRAPH]" if r.get("_graph_verified") else ""
-        lines.append(f"\n[{i}] {src}{graph_tag}")
-        lines.append(f"    ce={r.get('_ce_score',0):.3f} × {r.get('_multiplier',1):.2f} = {r.get('_score',0):.3f}")
-        lines.append(f"    {txt[:600]}...")
+
+    # Tier 1 & 1.5 Succeeded: Combine the results
+    lines = [f"Query: {query}"]
+
+    if rg_text:
+        lines.append("\n[SOURCE: EXACT KEYWORD MATCHES (Tier 1.5 - Local File Ripgrep)]")
+        lines.append(rg_text)
+
+    if rag_results and not low_confidence:
+        lines.append(f"\n[SOURCE: SEMANTIC CONTEXT (Tier 1 - LanceDB Top {len(rag_results)})]")
+        for i, r in enumerate(rag_results, 1):
+            src = r.get("source", "unknown")
+            txt = r.get("text", "").replace("&#xA0;", " ").replace("&amp;", "&").replace("\n", " ").strip()
+            graph_tag = " [GRAPH]" if r.get("_graph_verified") else ""
+            lines.append(f"\n[{i}] {src}{graph_tag}")
+            lines.append(f"    ce={r.get('_ce_score',0):.3f} × {r.get('_multiplier',1):.2f} = {r.get('_score',0):.3f}")
+            lines.append(f"    {txt[:600]}...")
+
     return "\n".join(lines)
+
+
+def query_slack_fallback(query: str) -> str:
+    """Query Slack when RAG returns no results."""
+    try:
+        result = subprocess.run(
+            ["slk", "search", query, "10"],
+            capture_output=True, text=True, timeout=60
+        )
+        if result.returncode != 0:
+            return f"No results found.\n\n(Slack search also failed: {result.stderr[:100]})"
+        lines = result.stdout.splitlines()[1:10]  # Skip header, get up to 10 results
+        if not lines:
+            return "No results found."
+        slack_results = []
+        for line in lines:
+            if "] " in line:
+                slack_results.append(line.split("] ", 1)[1][:400])
+        if not slack_results:
+            return "No results found."
+        output = [f"Query: {query}", "", f"Slack search ({len(slack_results)} results):"]
+        for i, r in enumerate(slack_results, 1):
+            output.append(f"\n[{i}] slack")
+            output.append(f"    {r}")
+        return "\n".join(output)
+    except Exception as e:
+        return f"No results found.\n\n(Slack fallback error: {str(e)[:100]})"
+
+
+def query_web_search(query: str) -> str:
+    """Query SearXNG web search as final fallback."""
+    try:
+        import urllib.request
+        import urllib.parse
+        req = urllib.request.Request(
+            f"{SEARXNG_URL}?q={urllib.parse.quote(query)}&format=json&engines=google,bing,duckduckgo&qtime=0",
+            headers={"Accept": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=15) as response:
+            data = json.loads(response.read().decode())
+            web_results = data.get("results", [])
+
+        allowed_domains = []
+        if ALLOWED_DOMAINS_FILE.exists():
+            with open(ALLOWED_DOMAINS_FILE) as f:
+                allowed_domains = json.load(f).get("domains", [])
+
+        filtered = []
+        for r in web_results[:10]:
+            url = r.get("url", "").lower()
+            if not allowed_domains or any(d.lower() in url for d in allowed_domains):
+                filtered.append(
+                    f"Title: {r.get('title')}\nURL: {r.get('url')}\nSnippet: {r.get('content', '')}"
+                )
+
+        if not filtered:
+            return "No results found."
+
+        output = [f"Query: {query}", "", f"Web search ({len(filtered)} results):"]
+        for i, r in enumerate(filtered, 1):
+            output.append(f"\n[{i}] {r}")
+        return "\n".join(output)
+    except Exception as e:
+        return f"No results found.\n\n(Web search error: {str(e)[:100]})"
+
+
+def query_ripgrep(query: str) -> str:
+    """Tier 1.5: Lexical exact-match search using ripgrep (parallel with RAG)."""
+    if not RAG_DOCS_DIR.exists():
+        return ""
+    try:
+        rg_proc = subprocess.run(
+            ["/opt/homebrew/bin/rg", "-F", "-n", "-i", "--", query, str(RAG_DOCS_DIR)],
+            capture_output=True, text=True, timeout=15
+        )
+        if rg_proc.returncode == 0 and rg_proc.stdout.strip():
+            lines = rg_proc.stdout.strip().split("\n")[:15]
+            # Truncate lines to prevent context window blowout
+            trimmed = [line[:250] + "..." if len(line) > 250 else line for line in lines]
+            return "\n".join(trimmed)
+    except Exception as e:
+        print(f"Ripgrep Error: {e}", file=sys.stderr)
+    return ""
 
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser()
+    import concurrent.futures
+
+    parser = argparse.ArgumentParser(description="Universal Nutanix RAG search engine with fallback waterfall.")
     parser.add_argument("--rerank-top", type=int, default=50)
     parser.add_argument("--identity", type=str,
                         help="Agent identity (sam | nx_shield). Overrides NX_AGENT_IDENTITY env var.")
+    parser.add_argument("--no-slack-search", action="store_true",
+                        help="Disable Slack fallback.")
+    parser.add_argument("--no-web-search", action="store_true",
+                        help="Disable Web (SearXNG) fallback.")
     parser.add_argument("query", type=str)
     parser.add_argument("limit", type=int, nargs="?", default=5)
     args = parser.parse_args()
+
     identity = (args.identity or NX_AGENT_IDENTITY).strip().lower()
-    results = run_search(args.query, args.limit, rerank_top=args.rerank_top, identity=identity)
+
+    # ── PARALLEL TIER 1 EXECUTION ──
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        rag_future = executor.submit(run_search, args.query, args.limit, rerank_top=args.rerank_top, identity=identity)
+        rg_future = executor.submit(query_ripgrep, args.query)
+
+        # Wait for both to finish
+        rag_results = rag_future.result()
+        rg_text = rg_future.result()
+
     print(file=sys.stderr)
-    print(format_results(results, args.query))
+
+    # ── FORMAT & FALLBACK WATERFALL ──
+    print(format_results(
+        rag_results=rag_results,
+        rg_text=rg_text,
+        query=args.query,
+        enable_slack=not args.no_slack_search,
+        enable_web=not args.no_web_search
+    ))
 
 
 if __name__ == "__main__":
