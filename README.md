@@ -14,17 +14,19 @@ Production data from simultaneous queries during the same session. Same model, s
 
 | Metric | Non-RAG (Direct LLM) | RAG-Grounded |
 |--------|---------------------|--------------|
-| **Answer quality** | Hallucinated — plausible but unsourced | Battlecard-sourced — specific KBs, versions, facts |
+| **Answer quality** | Hallucinated — didn't know what NAI stood for, guessed across 3 possibilities (Nutanix AI / NVIDIA AI / National AI), no sources | Identified NAI as Nutanix AI, cited 5 specific battlecards/summit docs with exact scores |
 | **Query latency** | ~1–2s | ~6–8s |
-| **Input tokens** | 14,394 | ~1,700 |
-| **Output tokens** | 1,621 | ~1,600 |
-| **Total tokens** | **75,631** | **~3,300** |
-| **Knowledge freshness** | Frozen at model training cutoff | Retrieval from Nutanix KB and docs |
-| **Domain accuracy** | Guessing | Verified |
+| **Input tokens** | ~900 | ~984 |
+| **Output tokens** | ~881 | ~934 |
+| **Total tokens** | **~1,781** | **~1,918** |
+| **Knowledge freshness** | Frozen at model training cutoff | Retrieval from live Nutanix battlecards, KB, and docs |
+| **Domain accuracy** | Guessing | Verified — ce=0.204 on top result, specific citations |
 
-### 23× fewer tokens — with better answers
+### Better answers, comparable token cost
 
-Without retrieval, the model "hallucinates context" into existence — burning 75,631 tokens trying to sound authoritative on Nutanix-specific configs, version lifecycle dates, and compatibility matrices it only partially trained on. With RAG, the retrieved documents do that work. The model synthesises, doesn't guess.
+Without retrieval, the model "hallucinates context" into existence — burning tokens to sound authoritative on Nutanix-specific configs, version lifecycle dates, and compatibility matrices it only partially trained on. On this query, it hallucinated that "NAI" could mean Nutanix AI, NVIDIA AI, or National AI — unable to confirm which. With RAG, the retrieved documents anchor the answer: NAI is Nutanix AI, sourced from 5 specific battlecard and summit documents with verifiable scores.
+
+Token cost is comparable (~1,918 RAG vs ~1,781 non-RAG). The extra ~137 tokens buy verifiable accuracy — a worthwhile trade in technical support.
 
 ### Accuracy vs Speed
 
@@ -32,10 +34,10 @@ Without retrieval, the model "hallucinates context" into existence — burning 7
 
 | Trade-off | Non-RAG | RAG-Grounded |
 |-----------|---------|--------------|
-| Answer accuracy | Unverified (hallucination risk) | Verified against source docs |
-| Token efficiency | 75,631/query | ~3,300/query (23× less) |
-| Source citation | None (guessing) | Specific KB numbers, product versions |
-| Reranking | None | Jina reranker-v3 (listwise, top 30→5) + DeepSeek topic boost |
+| Answer accuracy | Unverified (hallucination risk) | Verified against source docs (top result ce=0.204) |
+| Token efficiency | ~1,781/query | ~1,918/query (comparable) |
+| Source citation | None (guessing) | 5 specific battlecard filenames, KB numbers, version strings |
+| Reranking | None | Jina reranker-v3 (listwise, top 30→5) + DeepSeek topic boost + Kuzu graph boost |
 
 For internal note-taking or brainstorming, direct LLM wins on speed. For anything requiring domain accuracy — Nutanix compatibility lists, KB references, lifecycle dates — the 6–8s latency overhead is a worthwhile trade for verified, battlecard-sourced answers.
 
@@ -54,16 +56,19 @@ The query `"Can you compare Redhat AI with NAI?"` — **before Kuzu** retrieved 
 3. Cross-matches Kuzu entity names against LanceDB `ecosystem_entities` / `mentioned_products` columns
 4. Boosts chunks with graph-verified entity matches by **+0.15 RRF score** before cross-encoder reranking
 
-### Before vs After (real production query)
+### Before vs After (real production query — 2026-05-13)
+
+**Query:** `"Can you compare Redhat AI with NAI? please give me a summary"`
 
 | Metric | Before Kuzu (Vector + FTS only) | After Kuzu (Vector + FTS + Graph Boost) |
 |--------|----------------------------------|----------------------------------------|
-| **Top result** | `Red Hat AI vs Nutanix AI` battlecard | `Red Hat AI vs Nutanix AI` battlecard (graph-verified) |
-| **Entity verification** | None — pure embedding similarity | Kuzu graph confirms `Red_Hat`, `Nutanix_AI` entities present |
-| **Confidence signal** | CE score only | CE score + graph-verified flag + entity tags |
-| **Graph entities found** | — | 12 entity types in co-occurrence graph |
-| **Chunks boosted** | 0 | 3 chunks with +0.15 RRF bonus |
-| **Latency overhead** | — | ~100ms (parallel graph walk) |
+| **Top result** | `Red Hat AI vs Nutanix AI` battlecard (ce=0.199) | `Red Hat AI vs Nutanix AI` battlecard (ce=0.199, **graph-verified**) |
+| **Entity verification** | None — pure embedding similarity | 139 entity types confirmed via Kuzu co-occurrence walk |
+| **Confidence signal** | CE score only | CE score + `_graph_verified` flag + entity tags |
+| **Chunks boosted (+0.15 RRF)** | 0 | 3 chunks |
+| **Graph entities found** | — | **139 entity types** (vs 12 in earlier test) |
+| **Latency overhead** | — | ~100ms (parallel graph walk, no added latency) |
+| **Non-RAG baseline** | Hallucinated — guessed NAI = Nutanix/NVIDIA/National AI, no sources | Same hallucination (unchanged — non-RAG path unaffected by Kuzu) |
 
 ### Why It Matters
 
