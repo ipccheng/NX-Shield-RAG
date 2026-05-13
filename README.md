@@ -35,9 +35,41 @@ Without retrieval, the model "hallucinates context" into existence — burning 7
 | Answer accuracy | Unverified (hallucination risk) | Verified against source docs |
 | Token efficiency | 75,631/query | ~3,300/query (23× less) |
 | Source citation | None (guessing) | Specific KB numbers, product versions |
-| Reranking | None | Gemma 4 31B cross-encoder, top 30→5 |
+| Reranking | None | Jina reranker-v3 (listwise, top 30→5) + DeepSeek topic boost |
 
 For internal note-taking or brainstorming, direct LLM wins on speed. For anything requiring domain accuracy — Nutanix compatibility lists, KB references, lifecycle dates — the 6–8s latency overhead is a worthwhile trade for verified, battlecard-sourced answers.
+
+---
+
+## Before & After Kuzu: Adding Structural Entity Verification
+
+Kuzu was added as a **graph DB layer** that walks the entity co-occurrence graph to verify and boost chunks whose tagged entities match structural connections found in the source corpus.
+
+### What Changed
+
+The query `"Can you compare Redhat AI with NAI?"` — **before Kuzu** retrieved 5 results from pure vector + FTS similarity. **After adding Kuzu**, the pipeline additionally:
+
+1. Walks the Kuzu graph `(Chunk)-[r]->(Entity)` for entities connected to query terms (`Red_Hat`, `Nutanix_AI`)
+2. Finds 12 entity nodes in the graph with co-occurrence relationships to those terms
+3. Cross-matches Kuzu entity names against LanceDB `ecosystem_entities` / `mentioned_products` columns
+4. Boosts chunks with graph-verified entity matches by **+0.15 RRF score** before cross-encoder reranking
+
+### Before vs After (real production query)
+
+| Metric | Before Kuzu (Vector + FTS only) | After Kuzu (Vector + FTS + Graph Boost) |
+|--------|----------------------------------|----------------------------------------|
+| **Top result** | `Red Hat AI vs Nutanix AI` battlecard | `Red Hat AI vs Nutanix AI` battlecard (graph-verified) |
+| **Entity verification** | None — pure embedding similarity | Kuzu graph confirms `Red_Hat`, `Nutanix_AI` entities present |
+| **Confidence signal** | CE score only | CE score + graph-verified flag + entity tags |
+| **Graph entities found** | — | 12 entity types in co-occurrence graph |
+| **Chunks boosted** | 0 | 3 chunks with +0.15 RRF bonus |
+| **Latency overhead** | — | ~100ms (parallel graph walk) |
+
+### Why It Matters
+
+Vector similarity finds *linguistically similar* chunks. Kuzu finds *structurally related* chunks — documents that frequently mention the same entities together in the source corpus. Combining both signals means a query about "Red Hat AI" returns not just docs that *sound like* they're about Red Hat AI, but docs that are *verified by the graph* to be about Red Hat AI because other chunks in the corpus also mention those same entities.
+
+See [GRAPH_DB.md](./GRAPH_DB.md) for full schema, entity extraction, and query patterns.
 
 ---
 
@@ -80,17 +112,18 @@ Hindsight app setup and operations — covers Docker Compose architecture (Hinds
 
 | Component | Detail |
 |---|---|
-| Vector DB | LanceDB (`nutanix_rag_v3` — ~1.2 GB) |
+| Vector DB | LanceDB (`nutanix_rag_v3_dedup` — ~1.2 GB, ~85.6K chunks) |
 | Embedding | Jina AI `jina-embeddings-v5-text-small` (1024 dims) |
-| Classifier | Gemma 4 31B (for topic-based scoring boost, 3s timeout) |
+| Topic Classifier | DeepSeek (cloud, primary) / Gemma 4 31B (local fallback) |
+| Graph DB | Kuzu (`nutanix_graph_v3` — ~72K Chunk nodes, ~48K Entity nodes) |
 | Intent Routing | Keyword + entity-based dynamic filter construction |
 | Entity Extraction | tagger_v3 — 22 Nutanix products + 24 ecosystem entities |
 | Reranker | jina-reranker-v3 (Jina AI, listwise, top 30→5) |
 | Index | IvfHnswPq vector + FTS + scalar (access_level, doc_type, primary_product) |
 | Chunk size | 1024 tokens / 100 token overlap |
-| DB size | **129,732 chunks** / ~1.2 GB |
+| DB size | **~85,642 chunks** / ~1.2 GB (deduplicated) |
 | Query latency | ~6–8s (warm) |
-| Pipeline | 7-stage: intent routing → embed → LanceDB search → expand → rerank → score → format |
+| Pipeline | 11-stage: parallel (classify+embed+Kuzu+ripgrep) → intent filter → hybrid search → graph boost → expand → rerank → score → confidence filter → format + fallback |
 | Agents | Sam, NX_Shield (Discord bot) |
 
 ---
