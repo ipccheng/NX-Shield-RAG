@@ -248,7 +248,7 @@ Each agent has a **max_calls** limit enforced server-side by the gateway — not
 | `sam` | 3 | Mac mini main session |
 | `default` | 1 | Any unknown session |
 
-**How it works:** The gateway builds a session→agent map at startup by scanning `~/.openclaw/agents/*/sessions/*.jsonl`. When a tool call arrives, the session ID is looked up to identify the agent, and the call counter for that session is incremented. If the limit is exceeded, the gateway returns `MAX_CALLS_EXCEEDED` — no further calls are accepted.
+**How it works:** The gateway tracks per-session call counters. A **new conversation** (session first seen by this gateway) starts with counter=0. A **new query within a conversation** is detected by session file mtime advancing — the file grows when OpenClaw writes a new user message. On each tool call, if mtime increased since last call, the counter resets to 0 (fresh turn). If the limit is exceeded, the gateway returns `MAX_CALLS_EXCEEDED`.
 
 ### Two Components
 
@@ -407,6 +407,7 @@ The OpenClaw backup script keeps **14 days** of snapshots on T7. The LanceDB tab
 - **Old MCP services decommissioned**: `rag-mcp-server` (port 8001), `slack-search-mcp` (port 8005) LaunchAgents removed from launchd
 - **Per-agent call limits**: `gateway_config.json` enforces max_calls server-side (NX_Shield=2, Sam=3, default=1) — not LLM-dependent
 - **Session map**: gateway builds session→agent map at startup from `~/.openclaw/agents/*/sessions/*.jsonl` to identify calling agent
+- **Call counter reset**: mtime-based — counter resets when session file grows (new user message written). Handles sessions created after gateway startup correctly.
 
 ### 2026-05-12
 - Replaced **Gemma** with **DeepSeek** for topic classification
