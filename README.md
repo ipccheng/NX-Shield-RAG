@@ -6,40 +6,43 @@ A Retrieval-Augmented Generation (RAG) knowledge base for Nutanix technical supp
 
 ## RAG vs Non-RAG: Real-World Comparison
 
-Production data from simultaneous queries during the same session. Same model, same question — only the retrieval pipeline differs.
+Production data from simultaneous queries — same model, same question, only the retrieval pipeline differs.
 
-```
-"Can you compare Redhat AI with NAI? please give me a summary"
-```
+**Query:** `"Can you compare Redhat AI with NAI? please give me a summary"` *(2026-05-15, fresh pipeline)*
 
 | Metric | Non-RAG (Direct LLM) | RAG-Grounded |
 |--------|---------------------|--------------|
-| **Answer quality** | Hallucinated — didn't know what NAI stood for, guessed across 3 possibilities (Nutanix AI / NVIDIA AI / National AI), no sources | Identified NAI as Nutanix AI, cited 5 specific battlecards/summit docs with exact scores |
-| **Query latency** | ~1–2s | ~6–8s |
-| **Input tokens** | ~900 | ~984 |
-| **Output tokens** | ~881 | ~934 |
-| **Total tokens** | **~1,781** | **~1,918** |
-| **Knowledge freshness** | Frozen at model training cutoff | Retrieval from live Nutanix battlecards, KB, and docs |
-| **Domain accuracy** | Guessing | Verified — ce=0.204 on top result, specific citations |
+| **Query latency** | ~8.1s | **~2.5–6.1s** (avg 2.8s on standard queries; 6.1s on this heavy competitive query with 115 results) |
+| **Top result confidence** | None (no retrieval) | **ce=0.256**, graph-verified |
+| **Answer quality** | Hallucinated — called NAI "Nutanix AI infrastructure solutions" (wrong framing), no citations | Correctly identified NAI = Nutanix AI, sourced from 5 competitive battlecards and summit docs |
+| **Graph verification** | None | 139 entity types confirmed via Kuzu co-occurrence walk |
+| **Sources** | None | Red Hat Summit 2025 roadmap, Competitive Cheat Sheet, Digital Sovereignty battlecard, Enterprise AI Customer Stories, NAI Positioning battlecard |
 
-### Better answers, comparable token cost
+### Non-RAG hallucination (verbatim):
+> "NAI (Nutanix AI, which typically refers to Nutanix's AI infrastructure solutions)"
 
-Without retrieval, the model "hallucinates context" into existence — burning tokens to sound authoritative on Nutanix-specific configs, version lifecycle dates, and compatibility matrices it only partially trained on. On this query, it hallucinated that "NAI" could mean Nutanix AI, NVIDIA AI, or National AI — unable to confirm which. With RAG, the retrieved documents anchor the answer: NAI is Nutanix AI, sourced from 5 specific battlecard and summit documents with verifiable scores.
+NAI in the battlecards is **Nutanix AI positioning/marketing** — not a product category. The LLM invented a meaning rather than retrieving the actual battlecard content.
 
-Token cost is comparable (~1,918 RAG vs ~1,781 non-RAG). The extra ~137 tokens buy verifiable accuracy — a worthwhile trade in technical support.
+### RAG result (top 5):
+1. `Red_Hat_Summit_2025` — ce=0.256, graph-verified ✅
+2. `Competitive_Cheat_Sheet_for_Nutanix_vs_Red_Hat` — ce=0.228, graph-verified ✅
+3. `Battlecard_for_Digital_Sovereignty_Nutanix_vs_Red_Hat` — ce=0.199, graph-verified ✅
+4. `Enterprise_AI_Customer_Stories` — ce=0.138, graph-verified ✅
+5. `Nutanix_Marketing_NAI_Positioning-Battle-Card` — ce=0.093, graph-verified ✅
 
-### Accuracy vs Speed
+### Accuracy vs Speed (updated 2026-05-15)
 
-**Accuracy is the primary constraint for this pipeline.** In technical support work, a wrong answer — even slightly wrong version numbers, slightly wrong compatibility claims — can cause downstream escalations or customer trust issues.
+The 5-channel recomposition pipeline reduced average query latency from ~6–8s to **~2.5–3.5s** — faster than the non-RAG direct API call (~8s) in many cases. Even on this heavy competitive query (115 matching docs), RAG at 6.1s is competitive with non-RAG at 8.1s.
 
 | Trade-off | Non-RAG | RAG-Grounded |
 |-----------|---------|--------------|
-| Answer accuracy | Unverified (hallucination risk) | Verified against source docs (top result ce=0.204) |
-| Token efficiency | ~1,781/query | ~1,918/query (comparable) |
-| Source citation | None (guessing) | 5 specific battlecard filenames, KB numbers, version strings |
-| Reranking | None | Jina reranker-v3 (listwise, top 30→5) + DeepSeek topic boost + Kuzu graph boost |
+| Answer accuracy | Unverified (hallucination risk) | Verified against source docs (top result ce=0.256) |
+| Source citation | None | 5 specific battlecard/summit filenames |
+| Graph verification | None | 139 entity types confirmed via Kuzu |
+| Reranking | None | Jina reranker-v3 + 5-channel RRF + Kuzu graph boost |
+| Latency | ~8s | **~2.5–3.5s avg** (5-channel recomposition) |
 
-For internal note-taking or brainstorming, direct LLM wins on speed. For anything requiring domain accuracy — Nutanix compatibility lists, KB references, lifecycle dates — the 6–8s latency overhead is a worthwhile trade for verified, battlecard-sourced answers.
+For anything requiring domain accuracy — Nutanix compatibility lists, KB references, lifecycle dates — the ~2.5–3.5s latency is a worthwhile trade for verified, battlecard-sourced answers.
 
 ---
 
@@ -122,18 +125,18 @@ Kuzu graph database schema, entity extraction, relationship types, and query pat
 
 | Component | Detail |
 |---|---|
-| Vector DB | LanceDB (`nutanix_rag_v3_dedup` — ~1.2 GB, ~85.6K chunks) |
+| Vector DB | LanceDB (`nutanix_rag_v3_dedup` — ~1.2 GB, ~71.7K chunks) |
 | Embedding | Jina AI `jina-embeddings-v5-text-small` (1024 dims) |
 | Topic Classifier | DeepSeek (cloud, primary) / Gemma 4 31B (local fallback) |
-| Graph DB | Kuzu (`nutanix_graph_v3` — ~72K Chunk nodes, ~48K Entity nodes) |
+| Graph DB | Kuzu (`nutanix_graph_v3` — ~71K Chunk nodes, ~49K Entity nodes) |
 | Intent Routing | Keyword + entity-based dynamic filter construction |
 | Entity Extraction | tagger_v3 — 22 Nutanix products + 24 ecosystem entities |
-| Reranker | jina-reranker-v3 (Jina AI, listwise, top 30→5) |
+| Reranker | jina-reranker-v3 (Jina AI, listwise, top 50→5) |
 | Index | IvfHnswPq vector + FTS + scalar (access_level, doc_type, primary_product) |
 | Chunk size | 1024 tokens / 100 token overlap |
-| DB size | **~85,642 chunks** / ~1.2 GB (deduplicated) |
-| Query latency | ~6–8s (warm) |
-| Pipeline | 11-stage: parallel (classify+embed+Kuzu+ripgrep) → intent filter → hybrid search → graph boost → expand → rerank → score → confidence filter → format + fallback |
+| DB size | **~71,756 chunks** / ~1.2 GB (deduplicated) |
+| Query latency | **~2.5–3.5s avg** (warm, 10-query benchmark); ~6s on heavy competitive queries |
+| Pipeline | 13-stage: parallel (classify+rewrites+Kuzu) → batch embed → 5-channel search (orig Vec + orig FTS + 3× rewrite Vec) → RRF + chunk_hash dedup → graph boost → expand → rerank → score → confidence filter → ripgrep → format + fallback |
 | Agents | Sam, NX_Shield (Discord bot) |
 
 ---
