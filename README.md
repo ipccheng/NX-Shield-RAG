@@ -16,19 +16,12 @@ Production data from simultaneous queries — same model, same question, only th
 | **Top result confidence** | None (no retrieval) | **ce=0.256**, graph-verified |
 | **Answer quality** | Hallucinated — called NAI "Nutanix AI infrastructure solutions" (wrong framing), no citations | Correctly identified NAI = Nutanix AI, sourced from 5 competitive battlecards and summit docs |
 | **Graph verification** | None | 139 entity types confirmed via Kuzu co-occurrence walk |
-| **Sources** | None | Red Hat Summit 2025 roadmap, Competitive Cheat Sheet, Digital Sovereignty battlecard, Enterprise AI Customer Stories, NAI Positioning battlecard |
+| **Sources** | None | 5 competitive battlecards and summit documents (specific filenames not listed) |
 
 ### Non-RAG hallucination (verbatim):
 > "NAI (Nutanix AI, which typically refers to Nutanix's AI infrastructure solutions)"
 
 NAI in the battlecards is **Nutanix AI positioning/marketing** — not a product category. The LLM invented a meaning rather than retrieving the actual battlecard content.
-
-### RAG result (top 5):
-1. `Red_Hat_Summit_2025` — ce=0.256, graph-verified ✅
-2. `Competitive_Cheat_Sheet_for_Nutanix_vs_Red_Hat` — ce=0.228, graph-verified ✅
-3. `Battlecard_for_Digital_Sovereignty_Nutanix_vs_Red_Hat` — ce=0.199, graph-verified ✅
-4. `Enterprise_AI_Customer_Stories` — ce=0.138, graph-verified ✅
-5. `Nutanix_Marketing_NAI_Positioning-Battle-Card` — ce=0.093, graph-verified ✅
 
 ### Accuracy vs Speed (updated 2026-05-15)
 
