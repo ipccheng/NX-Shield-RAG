@@ -12,11 +12,11 @@ Production data from simultaneous queries — same model, same question, only th
 
 | Metric | Non-RAG (Direct LLM) | RAG-Grounded |
 |--------|---------------------|--------------|
-| **Query latency** | ~8.1s | **~2.5–6.1s** (avg 2.8s on standard queries; 6.1s on this heavy competitive query with 115 results) |
+| **Query latency** | ~8.1s | **~2.5–6.1s** (avg 2.8s on standard queries; 6.1s on this query with 115 results) |
 | **Top result confidence** | None (no retrieval) | **ce=0.256**, graph-verified |
-| **Answer quality** | Hallucinated — called NAI "Nutanix AI infrastructure solutions" (wrong framing), no citations | Correctly identified NAI = Nutanix AI, sourced from 5 competitive battlecards and summit docs |
+| **Answer quality** | Hallucinated — called NAI "Nutanix AI infrastructure solutions" (wrong framing), no citations | Correctly identified NAI = Nutanix AI, sourced from 5 battlecards and summit docs |
 | **Graph verification** | None | 139 entity types confirmed via Kuzu co-occurrence walk |
-| **Sources** | None | 5 competitive battlecards and summit documents (specific filenames not listed) |
+| **Sources** | None | 5 battlecards and summit documents (specific filenames not listed) |
 
 ### Non-RAG hallucination (verbatim):
 > "NAI (Nutanix AI, which typically refers to Nutanix's AI infrastructure solutions)"
@@ -25,7 +25,7 @@ NAI in the battlecards is **Nutanix AI positioning/marketing** — not a product
 
 ### Accuracy vs Speed (updated 2026-05-15)
 
-The 5-channel recomposition pipeline reduced average query latency from ~6–8s to **~2.5–3.5s** — faster than the non-RAG direct API call (~8s) in many cases. Even on this heavy competitive query (115 matching docs), RAG at 6.1s is competitive with non-RAG at 8.1s.
+The 5-channel recomposition pipeline reduced average query latency from ~6–8s to **~2.5–3.5s** — faster than the non-RAG direct API call (~8s) in many cases. Even on this query with 115 matching docs, RAG at 6.1s is competitive with non-RAG at 8.1s.
 
 | Trade-off | Non-RAG | RAG-Grounded |
 |-----------|---------|--------------|
@@ -128,7 +128,7 @@ Kuzu graph database schema, entity extraction, relationship types, and query pat
 | Index | IvfHnswPq vector + FTS + scalar (access_level, doc_type, primary_product) |
 | Chunk size | 1024 tokens / 100 token overlap |
 | DB size | **~71,756 chunks** / ~1.2 GB (deduplicated) |
-| Query latency | **~2.5–3.5s avg** (warm, 10-query benchmark); ~6s on heavy competitive queries |
+| Query latency | **~2.5–3.5s avg** (warm, 10-query benchmark); ~6s on heavy queries |
 | Pipeline | 13-stage: parallel (classify+rewrites+Kuzu) → batch embed → 5-channel search (orig Vec + orig FTS + 3× rewrite Vec) → RRF + chunk_hash dedup → graph boost → expand → rerank → score → confidence filter → ripgrep → format + fallback |
 | Agents | Sam, NX_Shield (Discord bot) |
 
