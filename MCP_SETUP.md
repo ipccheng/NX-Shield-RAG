@@ -9,8 +9,6 @@
 
 Two MCP servers run as system daemons on Mac mini, serving Nutanix RAG search to OpenClaw agents. Each agent (Sam and NX_Shield) has its own MCP server instance with identity-based access control, both running `universal_gateway_mcp.py` as the backend.
 
-**The old `mcp_server.py` (port 8001) and `nx_gateway_mcp.py` have been superseded by `universal_gateway_mcp.py`. Port 8001 is stale and has been removed from `openclaw.json`.**
-
 ---
 
 ## Architecture
@@ -63,7 +61,6 @@ OpenClaw Gateway
 
 | Port | Server Name (openclaw.json) | Script | Identity | rerank_top | Used By |
 |------|----------------------------|--------|----------|------------|---------|
-| 8001 | ~~`rag-mcp-server`~~ | `mcp_server.py` (old, **removed**) | — | — | **Stale — removed from openclaw.json** |
 | 8010 | `gateway-mcp` | `universal_gateway_mcp.py` | `nutanix_shield` | 5 | NX_Shield |
 | 8011 | `sam-gateway` | `universal_gateway_mcp.py` | `sam` | 5 | Sam |
 
@@ -163,8 +160,6 @@ Registered in `~/.openclaw/openclaw.json` under `mcp.servers`:
 }
 ```
 
-**Note:** `rag-mcp-server` (port 8001) has been removed — it was stale and pointing to the old deprecated `mcp_server.py`.
-
 ---
 
 ## Log Files
@@ -200,11 +195,9 @@ If `MAX_CALLS_EXCEEDED` is returned, the agent must compile its answer from resu
 
 ### 2026-05-16
 - **Script name corrected:** `nx_gateway_mcp.py` → `universal_gateway_mcp.py` throughout
-- **Port 8001 removed** from openclaw.json — `rag-mcp-server` entry deleted (was stale)
-- **Launchd service table updated:** removed `com.samai.mcp-nutanix-rag` row
-- **gateway_config.json updated:** all agents now 5 calls/turn (was 2/3)
 - Updated `lsof` check command to only show active ports 8010/8011
-- Removed references to old `mcp_server.py` and `rag-mcp-server` entries
+- Updated `gateway_config.json` rates to 5 calls/turn for all agents
+- Removed stale references to old `mcp_server.py` and `rag-mcp-server`
 
 ### 2026-05-13
 - Full rewrite — docs were reverted to old architecture
