@@ -1,15 +1,15 @@
-# MCP Server Setup — Nutanix RAG Pipeline (Updated 2026-05-13)
+# MCP Server Setup — Nutanix RAG Pipeline
 
-> **Last updated:** 2026-05-13
-> **Status:** Active — Updated to reflect current `nx_gateway_mcp.py` architecture
+> **Last updated:** 2026-05-16
+> **Status:** Active — Updated to reflect current `universal_gateway_mcp.py` architecture
 
 ---
 
 ## Overview
 
-Two MCP servers run as system daemons on Mac mini, serving Nutanix RAG search to OpenClaw agents. Each agent (Sam and NX_Shield) has its own MCP server instance with identity-based access control, both running `nx_gateway_mcp.py` as the backend.
+Two MCP servers run as system daemons on Mac mini, serving Nutanix RAG search to OpenClaw agents. Each agent (Sam and NX_Shield) has its own MCP server instance with identity-based access control, both running `universal_gateway_mcp.py` as the backend.
 
-**The old `mcp_server.py` (port 8001) is still registered but superseded by the new `nx_gateway_mcp.py` instances.**
+**The old `mcp_server.py` (port 8001) and `nx_gateway_mcp.py` have been superseded by `universal_gateway_mcp.py`. Port 8001 is stale and has been removed from `openclaw.json`.**
 
 ---
 
@@ -20,7 +20,7 @@ OpenClaw Gateway
 │
 ├── Sam (agent:main)
 │   └── tool: sam-gateway__master_search
-│       └── HTTP SSE → nx_gateway_mcp.py (port 8011, identity=sam)
+│       └── HTTP SSE → universal_gateway_mcp.py (port 8011, identity=sam)
 │           └── spawns: nutanix_rag_search.py --identity sam
 │               ├── Jina embed + LanceDB hybrid search
 │               ├── Kuzu graph walk (parallel)
@@ -29,7 +29,7 @@ OpenClaw Gateway
 │
 └── NX_Shield (agent:nutanix_shield)
     └── tool: gateway-mcp__master_search
-        └── HTTP SSE → nx_gateway_mcp.py (port 8010, identity=nx_shield)
+        └── HTTP SSE → universal_gateway_mcp.py (port 8010, identity=nx_shield)
             └── spawns: nutanix_rag_search.py --identity nx_shield
                 └── Same pipeline, hard-filtered to access_level='public'
 ```
@@ -38,9 +38,9 @@ OpenClaw Gateway
 
 ## Design Decisions
 
-### Why `nx_gateway_mcp.py` instead of calling the script directly?
+### Why `universal_gateway_mcp.py` instead of calling the script directly?
 
-`nx_gateway_mcp.py` is a thin SSE-to-subprocess bridge. It wraps `nutanix_rag_search.py` as a subprocess and exposes it as an MCP tool. Benefits:
+`universal_gateway_mcp.py` is a thin SSE-to-subprocess bridge. It wraps `nutanix_rag_search.py` as a subprocess and exposes it as an MCP tool. Benefits:
 
 1. **Protocol translation** — OpenClaw speaks MCP/SSE; `nutanix_rag_search.py` speaks plain stdout JSON
 2. **Identity enforcement at the gateway layer** — each MCP server instance has its own `--identity` baked in at launchd startup
@@ -50,12 +50,12 @@ OpenClaw Gateway
 ### Why separate MCP servers for Sam and NX_Shield?
 
 1. **Identity isolation** — Sam (`identity=sam`) sees all content; NX_Shield (`identity=nx_shield`) is hard-filtered to `access_level='public'` at the LanceDB query level
-2. **Independent rate limits** — `gateway_config.json` (`max_calls_per_session`) allows Sam 3 calls/query turn, NX_Shield only 2
+2. **Independent rate limits** — `gateway_config.json` (`max_calls_per_session`) allows 5 calls/query turn for all agents
 3. **Separate process** — a crash in one doesn't affect the other
 
 ### Sam bypasses MCP and calls the script directly?
 
-**No — this is outdated.** Sam uses `sam-gateway__master_search` via the MCP server on port 8011. This was updated after the original docs were written.
+**No.** Sam uses `sam-gateway__master_search` via the MCP server on port 8011.
 
 ---
 
@@ -63,9 +63,9 @@ OpenClaw Gateway
 
 | Port | Server Name (openclaw.json) | Script | Identity | rerank_top | Used By |
 |------|----------------------------|--------|----------|------------|---------|
-| 8001 | `rag-mcp-server` | `mcp_server.py` (old, deprecated) | — | 30 | Not in active use |
-| 8010 | `gateway-mcp` | `nx_gateway_mcp.py` | `nutanix_shield` | 5 | NX_Shield |
-| 8011 | `sam-gateway` | `nx_gateway_mcp.py` | `sam` | 5 | Sam |
+| 8001 | ~~`rag-mcp-server`~~ | `mcp_server.py` (old, **removed**) | — | — | **Stale — removed from openclaw.json** |
+| 8010 | `gateway-mcp` | `universal_gateway_mcp.py` | `nutanix_shield` | 5 | NX_Shield |
+| 8011 | `sam-gateway` | `universal_gateway_mcp.py` | `sam` | 5 | Sam |
 
 ---
 
@@ -89,16 +89,16 @@ Located at `~/.openclaw/workspace/scripts/gateway_config.json`. Controls per-age
 ```json
 {
   "max_calls_per_session": {
-    "nutanix_shield": 2,
-    "default": 1,
-    "main": 3
+    "nutanix_shield": 5,
+    "sam": 5,
+    "neo": 5,
+    "main": 5,
+    "default": 5
   }
 }
 ```
 
-- **`main`** = Sam (agent:main) — 3 calls per query turn
-- **`nutanix_shield`** = NX_Shield — 2 calls per query turn
-- **`default`** — fallback for unknown agents
+All agents are configured for 5 calls per query turn.
 
 ---
 
@@ -106,14 +106,13 @@ Located at `~/.openclaw/workspace/scripts/gateway_config.json`. Controls per-age
 
 Check running MCP servers:
 ```bash
-lsof -i :8001 -i :8010 -i :8011 | grep LISTEN
+lsof -i :8010 -i :8011 | grep LISTEN
 ```
 
 | Service Name | Script | Port | Identity | Config File |
 |---|---|---|---|---|
-| `com.samai.mcp-nutanix-rag` | `mcp_server.py` (old) | 8001 | — | `com.samai.mcp-nutanix-rag.plist` |
-| `com.samai.mcp-gateway-nx-shield` | `nx_gateway_mcp.py` | 8010 | `nutanix_shield` | `com.samai.mcp-gateway-nx-shield.plist` |
-| `com.samai.mcp-gateway-sam` | `nx_gateway_mcp.py` | 8011 | `sam` | `com.samai.mcp-gateway-sam.plist` |
+| `com.samai.mcp-gateway-nx-shield` | `universal_gateway_mcp.py` | 8010 | `nutanix_shield` | `com.samai.mcp-gateway-nx-shield.plist` |
+| `com.samai.mcp-gateway-sam` | `universal_gateway_mcp.py` | 8011 | `sam` | `com.samai.mcp-gateway-sam.plist` |
 
 **Restart NX_Shield MCP:**
 ```bash
@@ -127,12 +126,6 @@ launchctl kickstart -k gui/$(id -u)/com.samai.mcp-gateway-sam
 launchctl start com.samai.mcp-gateway-sam
 ```
 
-**Restart old MCP (if ever needed):**
-```bash
-launchctl kickstart -k gui/$(id -u)/com.samai.mcp-nutanix-rag
-launchctl start com.samai.mcp-nutanix-rag
-```
-
 ---
 
 ## MCP Tool Config (`openclaw.json`)
@@ -143,9 +136,17 @@ Registered in `~/.openclaw/openclaw.json` under `mcp.servers`:
 {
   "mcp": {
     "servers": {
-      "rag-mcp-server": {
-        "url": "http://127.0.0.1:8001/sse",
+      "web-search-filtered": {
+        "url": "http://127.0.0.1:8003/sse",
         "transport": "sse"
+      },
+      "storage-calc-mcp-server": {
+        "url": "http://127.0.0.1:8002/sse",
+        "transport": "sse"
+      },
+      "slack-search-mcp": {
+        "url": "http://127.0.0.1:8005/sse",
+        "description": "Slack search for NX_Shield"
       },
       "gateway-mcp": {
         "url": "http://127.0.0.1:8010/sse",
@@ -162,6 +163,8 @@ Registered in `~/.openclaw/openclaw.json` under `mcp.servers`:
 }
 ```
 
+**Note:** `rag-mcp-server` (port 8001) has been removed — it was stale and pointing to the old deprecated `mcp_server.py`.
+
 ---
 
 ## Log Files
@@ -171,7 +174,6 @@ Registered in `~/.openclaw/openclaw.json` under `mcp.servers`:
 /tmp/nx_gateway_err.log  (NX_Shield gateway stderr)
 /tmp/sam_gateway_out.log  (Sam gateway stdout)
 /tmp/sam_gateway_err.log  (Sam gateway stderr)
-~/.openclaw/logs/mcp-nutanix-rag-sam.log  (old mcp_server.py)
 ```
 
 ---
@@ -188,7 +190,7 @@ Registered in `~/.openclaw/openclaw.json` under `mcp.servers`:
 
 ## Rate Limiting Internals
 
-The `_check_and_increment()` function in `nx_gateway_mcp.py` uses session file mtime to detect when a new query turn starts (compaction creates a new session file). Call counts reset automatically on session turnover.
+The `_check_and_increment()` function in `universal_gateway_mcp.py` uses session file mtime to detect when a new query turn starts (compaction creates a new session file). Call counts reset automatically on session turnover.
 
 If `MAX_CALLS_EXCEEDED` is returned, the agent must compile its answer from results already received — no further `master_search` calls are allowed in that turn.
 
@@ -196,8 +198,16 @@ If `MAX_CALLS_EXCEEDED` is returned, the agent must compile its answer from resu
 
 ## Changelog
 
+### 2026-05-16
+- **Script name corrected:** `nx_gateway_mcp.py` → `universal_gateway_mcp.py` throughout
+- **Port 8001 removed** from openclaw.json — `rag-mcp-server` entry deleted (was stale)
+- **Launchd service table updated:** removed `com.samai.mcp-nutanix-rag` row
+- **gateway_config.json updated:** all agents now 5 calls/turn (was 2/3)
+- Updated `lsof` check command to only show active ports 8010/8011
+- Removed references to old `mcp_server.py` and `rag-mcp-server` entries
+
 ### 2026-05-13
-- **Full rewrite** — docs were reverted to old architecture
+- Full rewrite — docs were reverted to old architecture
 - Replaced `mcp_server.py` architecture with current `nx_gateway_mcp.py` setup
 - Updated port assignments: 8001 (old/deprecated) → 8010 (NX_Shield) + 8011 (Sam)
 - Updated tool names: `rag-mcp-server__query_nutanix_docs` → `sam-gateway__master_search` / `gateway-mcp__master_search`
