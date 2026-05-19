@@ -1,6 +1,6 @@
 # NX_Shield RAG Pipeline — Architecture & Documentation
 
-> **Last updated:** 2026-05-15
+> **Last updated:** 2026-05-19
 > **Status:** Active
 > **Script:** `nutanix_rag_search.py` (workspace/scripts/)
 > **MCP Backend:** `universal_gateway_mcp.py` → `nutanix_rag_search.py` subprocess via `subprocess.run()`
@@ -11,7 +11,12 @@
 
 This document describes the Nutanix technical knowledge base RAG (Retrieval-Augmented Generation) pipeline used by **Sam**, **Neo**, and **NX_Shield** to answer Nutanix product, KB, and troubleshooting questions.
 
-The pipeline runs query recomposition (LLM rewrites + parallel embedding) + Ripgrep in parallel, then falls back through Slack and SearXNG web search if confidence is low.
+The pipeline performs intent classification + query recomposition via DeepSeek, then runs parallel embedding and multi-channel search. **Two routing modes:**
+
+- **[SINGLE]** — generates 3 linguistic rewrites of the original query; each rewrite acts as a tiebreaker at low weight (0.3)
+- **[COMPARISON]** — decomposes "A vs B" / "differences between X and Y" queries into 2–4 distinct sub-queries, one per product or approach; each sub-query runs as a primary search at full weight (1.0) with both Vector and FTS
+
+Ripgrep runs in parallel with the RAG search. Fallback waterfall: Slack CLI → SearXNG web search on low confidence.
 
 ---
 
@@ -26,25 +31,28 @@ QUERY
  ┌──────────────────────────────────────────────────────────────┐
  │  PARALLEL Stage 1 (ThreadPoolExecutor, max_workers=3)       │
  │  1. DeepSeek topic classify                                 │
- │  2. LLM rewrite — generate_rewrites() → 3 variants          │
+ │  2. LLM routing — generate_routing() → intent + queries    │
  │  3. Kuzu graph walk (entity co-occurrence)                 │
  └──────────────────────────────────────────────────────────────┘
  │
  ▼
- jina_embed_batch([orig + 3 rewrites])  ← 1 API call, 4 vectors
+ jina_embed_batch([orig + 3 variants])  ← 1 API call
  │
  ▼
  ┌──────────────────────────────────────────────────────────────┐
- │  PARALLEL Stage 2 (5 search channels, ThreadPoolExecutor)    │
+ │  PARALLEL Stage 2 (search channels, ThreadPoolExecutor)   │
  │                                                              │
- │  Channel 1: Original query → Vector search   (weight=1.0)   │
- │  Channel 2: Original query → FTS search      (weight=1.0)   │
- │  Channel 3: Rewrite 1      → Vector search   (weight=0.3)   │
- │  Channel 4: Rewrite 2      → Vector search   (weight=0.3)   │
- │  Channel 5: Rewrite 3      → Vector search   (weight=0.3)   │
+ │  [SINGLE] mode:                                             │
+ │    Channel 1: Original → Vector search    (weight=1.0)      │
+ │    Channel 2: Original → FTS search       (weight=1.0)     │
+ │    Channel 3–5: Rewrites 1–3 → Vector   (weight=0.3 each) │
  │                                                              │
- │  → rrf_merge(channel_weights=[1.0, 1.0, 0.3, 0.3, 0.3])    │
- │    Accumulation key: chunk_hash (not source)                 │
+ │  [COMPARISON] mode:                                         │
+ │    Original → de-prioritised (weight=0.3)                   │
+ │    Each sub-query ×2: Vector (1.0) + FTS (1.0)            │
+ │                                                              │
+ │  → rrf_merge(channel_weights=[...])                         │
+ │    Accumulation key: chunk_hash (not source)                │
  │    Post-RRF dedup: keep highest rrf_score per source        │
  └──────────────────────────────────────────────────────────────┘
  │
@@ -69,8 +77,8 @@ QUERY
  │
  ▼
  FALLBACK WATERFALL (if low confidence)
-   → query_slack_fallback() via slack-search-mcp
-   → query_web_search() via SearXNG
+   → query_slack_fallback() via slk CLI
+   → query_web_search() via SearXNG direct HTTP
  │
  ▼
  ripgrep (parallel with RAG — not in pipeline, fed to format_results)
@@ -84,7 +92,7 @@ QUERY
 ## LanceDB Table (nutanix_rag_v3_dedup)
 
 - **Path:** `~/.openclaw/memory/lancedb-pro/nutanix_rag_v3_dedup.lance`
-- **Rows:** ~71,756 (deduplicated from ~129K — dedup ran 2026-05-14)
+- **Rows:** ~71,765 (deduplicated from ~129K — dedup ran 2026-05-14)
 - **Size:** ~1.2 GB
 - **Embedding:** Jina AI `jina-embeddings-v5-text-small` (1024 dims)
 - **Indexes:** IVF_HNSW_SQ vector index (metric=cosine, m=20, ef=300), BM25 FTS index, BTree on scalar columns
@@ -112,11 +120,13 @@ QUERY
 
 ## Query Paths
 
-| Agent | MCP Tool | Identity | Rate Limit |
-|---|---|---|---|
-| Neo | `neo__master_search` | `neo` | 3 calls/turn |
-| Sam | `sam-gateway__master_search` | `sam` | 3 calls/turn |
-| NX_Shield | `gateway-mcp__master_search` | `nx_shield` (public only) | 2 calls/turn |
+All agents route through the same MCP gateway on their respective host:
+
+| Agent | MCP Tool | Host | Identity | Rate Limit |
+|---|---|---|---|---|
+| Neo | `neo__master_search` | MacBook :8010 | `neo` | 3 calls/turn |
+| Sam | `sam-gateway__master_search` | Mac mini :8010 | `sam` | 3 calls/turn |
+| NX_Shield | `gateway-mcp__master_search` | Mac mini :8010 | `nx_shield` (public only) | 2 calls/turn |
 
 All MCP servers run `universal_gateway_mcp.py` → `nutanix_rag_search.py` subprocess via Python `subprocess.run()`.
 
@@ -126,9 +136,9 @@ All MCP servers run `universal_gateway_mcp.py` → `nutanix_rag_search.py` subpr
 
 | Stage | Function | Duration |
 |---|---|---|
-| S1 | Parallel: DeepSeek classify + generate_rewrites + Kuzu graph | ~1-2s |
+| S1 | Parallel: DeepSeek classify + generate_routing + Kuzu graph | ~1-2s |
 | S2 | jina_embed_batch — 1 API call, 4 vectors (orig + 3 rewrites) | ~0.5s |
-| S3 | 5-channel parallel LanceDB search (1 Vec + 1 FTS + 3 Vec rewrites) | ~0.3s |
+| S3 | Multi-channel parallel LanceDB search (mode-dependent) | ~0.3s |
 | S4 | RRF merge with channel_weights + chunk_hash accumulation + source dedup | ~0.01s |
 | S5 | Fallback retry (if < 3 unique sources) — security-only filter | — |
 | S6 | **Graph Boost** — Kuzu entity match, +0.15 to rrf_score | ~0.1s |
@@ -156,41 +166,46 @@ Three operations run simultaneously:
 - Falls back to keyword-based intent detection if DeepSeek fails
 - Output: list of topic strings (e.g. `["AHV", "CLUSTER_SIZING"]`)
 
-**2. LLM rewrite — generate_rewrites()**
-- DeepSeek LLM generates 3 distinct rewrite phrases of the original query
-- Each rewrite is a standalone search phrase (not a question), 5-12 words
-- Returns `[rewrite1, rewrite2, rewrite3]` or `["", "", ""]` on failure
-- Regex fallback if JSON parse fails: extracts phrases from LLM's non-JSON text
-- No rewrite if DeepSeek API unreachable — proceeds with original query only
+**2. LLM routing — generate_routing()**
+- Single-pass DeepSeek call returns `{"intent": "single"|"comparison", "queries": [...]}`
+- `[SINGLE]`: generates 3 linguistic rewrites — tiebreakers at weight 0.3
+- `[COMPARISON]`: decomposes into 2–4 sub-queries, one per product/approach — each a primary search at weight 1.0
+- Regex + JSON fallback on parse failure
+- One LLM call = zero extra latency vs. old generate_rewrites() approach
 
 **3. Kuzu graph walk**
-- Queries `~/.openclaw/memory/kuzu-pro/nutanix_graph_v3/`
+- Opens `~/.openclaw/memory/kuzu-pro/nutanix_graph_v3/` as embedded library (no daemon required)
 - Extracts entities connected to query terms via `(Chunk)-[r]->(Entity)` relationships
 - Entity names match LanceDB's `ecosystem_entities` / `mentioned_products` columns
 - Used for Graph Boost in Stage S6
+- **Verified data:** 71,765 Chunk nodes, 49,075 Entity nodes, 336,886 HAS_RELATIONSHIP edges
 
 ### S2 — Batch Embedding (jina_embed_batch)
 
-All 4 queries (1 original + 3 rewrites) are embedded in a **single Jina API call**:
+All queries are embedded in a **single Jina API call**:
 
 ```
 POST https://api.jina.ai/v1/embeddings
 {"model": "jina-embeddings-v5-text-small", "input": [orig, rw1, rw2, rw3]}
 ```
 
-Returns 4 vectors. If rewrites failed, fewer vectors are returned — the pipeline adapts dynamically.
+Returns vectors in the same order as input. If rewrites fail, fewer vectors are returned — the pipeline adapts dynamically.
 
-### S3 — 5-Channel Parallel Search
+### S3 — Multi-Channel Parallel Search
 
-Exactly 5 tasks run in parallel (ThreadPoolExecutor with max_workers=5):
+**[SINGLE] mode** — 5 channels:
 
-| Channel | Query | Method | Weight | Rationale |
-|---|---|---|---|---|
-| 1 | Original | Vector | 1.0 | Primary semantic search |
-| 2 | Original | FTS (BM25) | 1.0 | Lexical exact-match boost |
-| 3 | Rewrite 1 | Vector | 0.3 | Semantic diversification |
-| 4 | Rewrite 2 | Vector | 0.3 | Semantic diversification |
-| 5 | Rewrite 3 | Vector | 0.3 | Semantic diversification |
+| Channel | Query | Method | Weight |
+|---|---|---|---|
+| 1 | Original | Vector | 1.0 |
+| 2 | Original | FTS (BM25) | 1.0 |
+| 3–5 | Rewrites 1–3 | Vector | 0.3 each |
+
+**[COMPARISON] mode** — channels vary by sub-query count:
+
+- Original query: Vector + FTS at **0.3** (de-prioritised — "A vs B" mixed results are noise)
+- Each sub-query: Vector + FTS at **1.0** each (each product/approach gets a clean primary search)
+- Total channels: `2 + (subqueries × 2)`
 
 **No FTS on rewrites** — saves ~60% LanceDB I/O. Vector-only is sufficient for rewrite channels.
 
@@ -199,7 +214,7 @@ Exactly 5 tasks run in parallel (ThreadPoolExecutor with max_workers=5):
 ### S4 — RRF Merge with Channel Weights
 
 ```python
-rrf_merge(results_by_method, k=60, channel_weights=[1.0, 1.0, 0.3, 0.3, 0.3])
+rrf_merge(results_by_method, k=60, channel_weights=[...])  # mode-dependent
 ```
 
 **Accumulation key: chunk_hash** (not `source`). The same paragraph appearing in multiple search channels gets a compounded RRF boost. The CE pool still sees one representative doc per chunk_hash.
@@ -265,8 +280,8 @@ Jina's hosted listwise reranker scores semantic relevance. Falls back to RRF sco
 
 `format_results()` called from `main()` with both RAG results and ripgrep text. If RAG confidence is low (all CE scores < 0.10):
 
-1. **Slack fallback** — `slack-search-mcp__slack_search` via port 8005
-2. **SearXNG web fallback** — `http://127.0.0.1:8888/search` with allowed domains filter
+1. **Slack fallback** — `slk search` CLI subprocess (direct call, not MCP)
+2. **SearXNG web fallback** — direct HTTP POST to `http://127.0.0.1:8888` (not MCP)
 
 ### S12 — Ripgrep (Parallel)
 
@@ -301,7 +316,7 @@ Maps topic → subcategory string. Used in `score_multiplier()` for subcategory-
 Maps topic → KB article number. Used in `score_multiplier()` to boost KB-matching results.
 
 ### Channel Weights
-`[1.0, 1.0, 0.3, 0.3, 0.3]` — 5 channels: orig Vec, orig FTS, 3 rewrite Vecs. Passed to `rrf_merge()`.
+Mode-dependent — `[SINGLE]`: `[1.0, 1.0, 0.3, 0.3, 0.3]`; `[COMPARISON]`: `[0.3] + [1.0, 1.0] × N_subqueries`.
 
 ---
 
@@ -310,12 +325,12 @@ Maps topic → KB article number. Used in `score_multiplier()` to boost KB-match
 | Component | Host | Notes |
 |---|---|---|
 | LanceDB + search | MacBook + Mac mini | `nutanix_rag_v3_dedup`, synced via rsync |
-| Kuzu graph DB | MacBook + Mac mini | `nutanix_graph_v3` |
-| DeepSeek API | Cloud | Topic classification + query rewrites |
+| Kuzu graph DB | MacBook + Mac mini | `nutanix_graph_v3` — embedded library, opened in-process per query (no daemon) |
+| DeepSeek API | Cloud | Topic classification + query routing |
 | Jina Embed API | Cloud (api.jina.ai) | Batch vectorization (4 vectors/call) |
 | Jina Rerank API | Cloud (api.jina.ai) | Semantic reranking |
-| SearXNG | Mac mini (:8888) | Web search fallback |
-| Slack MCP | Mac mini (:8005) | Slack search fallback |
+| SearXNG | Mac mini (:8888) | Web search fallback — direct HTTP |
+| Slack | MacBook | `slk search` CLI subprocess (direct call) |
 | OpenClaw gateway | MacBook + Mac mini | Agent orchestration |
 
 ---
@@ -339,6 +354,16 @@ tar -xzf YYYYMMDD-openclaw-backup.tar.gz -C /Users/ipccheng/
 
 ## Changelog
 
+### 2026-05-19 — Intent Routing + Documentation Corrections
+- **generate_routing()** — replaces generate_rewrites(): single-pass DeepSeek call returns `{intent, queries}` dict; zero extra latency
+- **[SINGLE] mode** — 3 linguistic rewrites as tiebreakers (0.3 weight); 5-channel search unchanged from prior doc
+- **[COMPARISON] mode** — decomposes "A vs B" queries into 2–4 sub-queries; each runs Vector + FTS at 1.0; original query de-prioritised to 0.3
+- **Kuzu** — confirmed working as embedded library (no daemon). Database verified: 71,765 Chunk nodes, 49,075 Entity nodes, 336,886 HAS_RELATIONSHIP edges
+- **Slack fallback** — corrected from MCP reference to direct `slk search` CLI subprocess call
+- **Web fallback** — clarified as direct HTTP to SearXNG (:8888), not MCP
+- **S3 channel weights** — documented mode-dependent weights; COMPARISON mode skips fixed 5-channel assumption
+- **Runtime Infrastructure** — Kuzu row updated to clarify embedded library pattern (no daemon)
+
 ### 2026-05-15 — Query Recomposition Pipeline
 - **generate_rewrites()** — new function: DeepSeek LLM generates 3 rewrite phrases per query; regex fallback if JSON parse fails
 - **jina_embed_batch()** — new function: batches all 4 queries (1 orig + 3 rewrites) into 1 Jina API call
@@ -347,10 +372,6 @@ tar -xzf YYYYMMDD-openclaw-backup.tar.gz -C /Users/ipccheng/
 - **score_multiplier()** — replaced 0.75× General penalty with 0.85× `mentioned_products` empty safeguard
 - **expand_for_rerank()** — now uses `t.to_arrow()` approach (~0.2s), immune to LanceDB async deadlock
 - **Bug #2217 workaround** — short/empty queries cleaned before FTS; <2 chars returns error early
-- **Latency improved** — ~2.5-3.5s average (was 6-8s); 5 parallel channels instead of 2 sequential hybrid calls
-- **Stage count** — 11 stages → 13 stages (S1 split: classify/rewrites/Kuzu; S2: batch embed; S3: 5-channel search; S12: ripgrep)
-- **Row count** — updated to ~71,756 (was 85,642; 83,129 after May 14 dedup run)
-- **MCP backend** — `nx_gateway_mcp.py` → `universal_gateway_mcp.py`
 
 ### 2026-05-13 — DeepSeek Classifier
 - **Topic classifier:** Gemma → **DeepSeek** (primary); Gemma retained as local fallback
