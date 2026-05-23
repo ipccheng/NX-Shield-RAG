@@ -1,6 +1,6 @@
 # NX_Shield RAG Pipeline — Architecture & Documentation
 
-> **Last updated:** 2026-05-19
+> **Last updated:** 2026-05-24
 > **Status:** Active
 > **Script:** `nutanix_rag_search.py` (workspace/scripts/)
 > **MCP Backend:** `universal_gateway_mcp.py` → `nutanix_rag_search.py` subprocess via `subprocess.run()`
@@ -53,7 +53,7 @@ QUERY
  │                                                              │
  │  → rrf_merge(channel_weights=[...])                         │
  │    Accumulation key: chunk_hash (not source)                │
- │    Post-RRF dedup: keep highest rrf_score per source        │
+ │    Source diversity after CE rerank, not before rerank      │
  └──────────────────────────────────────────────────────────────┘
  │
  ▼
@@ -138,19 +138,19 @@ All MCP servers run `universal_gateway_mcp.py` → `nutanix_rag_search.py` subpr
 |---|---|---|
 | S1 | Parallel: DeepSeek classify + generate_routing + Kuzu graph | ~1-2s |
 | S2 | jina_embed_batch — 1 API call, 4 vectors (orig + 3 rewrites) | ~0.5s |
-| S3 | Multi-channel parallel LanceDB search (mode-dependent) | ~0.3s |
-| S4 | RRF merge with channel_weights + chunk_hash accumulation + source dedup | ~0.01s |
+| S3 | Multi-channel parallel LanceDB search (mode-dependent) | ~0.1s mean observed |
+| S4 | RRF merge with channel_weights + chunk_hash accumulation | ~0.01s |
 | S5 | Fallback retry (if < 3 unique sources) — security-only filter | — |
 | S6 | **Graph Boost** — Kuzu entity match, +0.15 to rrf_score | ~0.1s |
 | S7 | expand_for_rerank (±2 neighbor context via t.to_arrow()) | **~0.2s** |
-| S8 | Jina cross-encoder rerank (top 50 → top 5) | ~1s |
+| S8 | Jina cross-encoder rerank (top 30/50 → top 5) | ~1.8s mean observed |
 | S9 | score_multiplier() — KB#, subcategory, products, mentioned_products | ~0.01s |
 | S10 | Confidence filter (CE < 0.1 AND mult ≤ 1.0 → discard) | ~0.01s |
 | S11 | Swap expanded text into `text` field | — |
 | S12 | ripgrep (parallel with S1-S3 via ThreadPoolExecutor) | ~0.5s |
 | S13 | format_results() + fallback waterfall | — |
 
-**Total pipeline latency:** ~2.5-3.5s per query (warm) — significantly faster than the old 6-8s.
+**Observed Milestone 5 latency:** 10-case sanitized eval mean external runtime `5.39s`; mean internal timed search path `4.72s`. Largest measured costs are DeepSeek/Kuzu parallel prep and Jina rerank.
 
 ---
 
@@ -219,7 +219,7 @@ rrf_merge(results_by_method, k=60, channel_weights=[...])  # mode-dependent
 
 **Accumulation key: chunk_hash** (not `source`). The same paragraph appearing in multiple search channels gets a compounded RRF boost. The CE pool still sees one representative doc per chunk_hash.
 
-**Post-RRF dedup by source:** Keeps the highest rrf_score per file. This ensures the CE pool has diverse file coverage — multiple pages from the same file won't dominate just because one paragraph ranked highly.
+**Source diversity after CE rerank:** Multiple chunks from the same source can survive into the cross-encoder pool. After CE scoring and confidence filtering, `diversify_by_source()` prefers one final result per source and backfills only if needed. This avoids suppressing strong localized chunks before semantic reranking.
 
 ### S5 — Fallback Retry
 
@@ -264,10 +264,11 @@ Jina's hosted listwise reranker scores semantic relevance. Falls back to RRF sco
 | KB# text match | KB number in chunk text | up to 1.15× |
 | KB doc boost | `kb-` in source URL | 1.1× |
 | Subcategory match | doc's `primary_product` matches topic's subcategory | 1.15× |
-| **mentioned_products safeguard** | doc has zero `mentioned_products` | **0.85×** |
+| General/empty primary product penalty | topic expects a specific subcategory but doc primary product is empty/General | 0.75× |
 | Products match | doc's `mentioned_products` intersect topic's products | 1.2× |
+| Source authority | `github/*` on general non-API/non-Calm queries | 0.55× |
 
-> ⚠️ **mentioned_products safeguard (2026-05-15):** Replaced the old 0.75× `General` primary_product penalty. A legitimate broad doc (e.g., "Nutanix General Overview") will still have `mentioned_products = ["AHV", "AOS"]` from the tagger. The 0.85× penalty catches ingestion bugs where the parser completely failed to extract any product metadata.
+> ⚠️ **Source authority tuning (2026-05-24):** `github/*` remains valid for API/dev/Ansible/Terraform/Calm-style queries, but is down-weighted for general operations queries so authoritative portal/KB docs win near-ties.
 
 **Cap:** 1.4× maximum to preserve CE semantic primacy.
 
@@ -281,11 +282,11 @@ Jina's hosted listwise reranker scores semantic relevance. Falls back to RRF sco
 `format_results()` called from `main()` with both RAG results and ripgrep text. If RAG confidence is low (all CE scores < 0.10):
 
 1. **Slack fallback** — `slk search` CLI subprocess (direct call, not MCP)
-2. **SearXNG web fallback** — direct HTTP POST to `http://127.0.0.1:8888` (not MCP)
+2. **SearXNG web fallback** — direct HTTP JSON request to `http://127.0.0.1:8888/search` (not MCP)
 
 ### S12 — Ripgrep (Parallel)
 
-Ripgrep runs in parallel with the RAG search via a separate `ThreadPoolExecutor(max_workers=4)`. It uses the **Homebrew-installed rg** (`/opt/homebrew/bin/rg`):
+Ripgrep runs in parallel with the RAG search via a separate `ThreadPoolExecutor` in `main()`. It uses the **Homebrew-installed rg** (`/opt/homebrew/bin/rg`):
 
 ```bash
 /opt/homebrew/bin/rg -F -n -i -- "<query>" ~/.openclaw/workspace/rag/nutanix/
@@ -316,7 +317,33 @@ Maps topic → subcategory string. Used in `score_multiplier()` for subcategory-
 Maps topic → KB article number. Used in `score_multiplier()` to boost KB-matching results.
 
 ### Channel Weights
-Mode-dependent — `[SINGLE]`: `[1.0, 1.0, 0.3, 0.3, 0.3]`; `[COMPARISON]`: `[0.3] + [1.0, 1.0] × N_subqueries`.
+Mode-dependent — `[SINGLE]`: `[1.0, 1.0, 0.3, 0.3, 0.3]`; `[COMPARISON]`: `[0.3, 0.3] + [1.0, 1.0] × N_subqueries`.
+
+### Timing Instrumentation
+`run_search()` emits a sanitized timing line to stderr for baseline/eval parsing:
+
+```text
+[TIMING] {"parallel_prep": ..., "embedding": ..., "search_channels": ..., "rerank": ..., "total": ...}
+```
+
+The baseline/eval reports store timing metadata and source identifiers only; retrieved KB text snippets are not persisted.
+
+---
+
+## Current Bottlenecks and Follow-up Backlog
+
+Milestone 5 showed that Stage 2 LanceDB search is no longer the main latency bottleneck. The largest measured costs are now:
+
+1. `parallel_prep` — DeepSeek classification/routing plus Kuzu graph walk
+2. `rerank` — Jina cross-encoder call
+3. per-query process/runtime overhead from the MCP subprocess execution model
+
+Recommended next optimizations:
+
+- **Persistent service/module mode:** avoid per-query subprocess startup and reuse LanceDB/Kuzu handles plus HTTP clients.
+- **Rerank optimization:** tune rerank pool size dynamically, skip rerank for high-confidence exact/KB queries where safe, or test alternative/batched reranker strategies.
+- **Parallel prep optimization:** cache DeepSeek classification/routing, cache query embeddings, and make Kuzu optional/conditional by query type.
+- **Eval expansion before more quality tuning:** comparison and Flow/security queries pass but can have first relevant rank 2; add more comparison/security examples before tuning weights further to avoid overfitting.
 
 ---
 
@@ -353,6 +380,14 @@ tar -xzf YYYYMMDD-openclaw-backup.tar.gz -C /Users/ipccheng/
 ---
 
 ## Changelog
+
+### 2026-05-24 — Milestone 5 Performance Instrumentation + Channel Cleanup
+- **Timing instrumentation** — added `[TIMING]` JSON output for guard, DB open, parallel prep, embedding, Stage 2 search, graph boost, context expansion, rerank, postprocess, and total.
+- **Stage 2 parallelization** — channel searches are executed with `ThreadPoolExecutor` while preserving deterministic channel order for weighted RRF.
+- **Channel topology helper** — `route_search_methods()` enforces vector+FTS for original routes and vector-only for SINGLE rewrites.
+- **COMPARISON original query** — original mixed comparison query is preserved at weight `0.3`; decomposed subqueries remain weight `1.0`.
+- **Eval expansion** — sanitized eval suite expanded from 5 to 10 cases; latest run: 10/10 pass, Hit@5 10/10, mean MRR 0.9, mean latency 5.39s.
+- **Follow-up backlog** — documented persistent service mode, rerank optimization, parallel prep caching/conditional Kuzu, and eval expansion before additional quality tuning.
 
 ### 2026-05-19 — Intent Routing + Documentation Corrections
 - **generate_routing()** — replaces generate_rewrites(): single-pass DeepSeek call returns `{intent, queries}` dict; zero extra latency
