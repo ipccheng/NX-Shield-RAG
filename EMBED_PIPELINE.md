@@ -1,6 +1,6 @@
 # NX_Shield RAG Embedding Pipeline — Documentation
 
-> **Last updated:** 2026-05-20
+> **Last updated:** 2026-05-24
 > **Scripts:** `embed_pipeline_v3.py` (batch) / `embed_one.py` (single file) + `tagger_v3.py` + `kuzu_writer.py`
 > **Status:** Active — 71,775 chunks in LanceDB `nutanix_rag_v3_dedup`, 71,770 Chunk nodes + 49,132 Entity nodes in Kuzu `nutanix_graph_v3` (336,953 `HAS_RELATIONSHIP` + 336,225 `RELATED_TO` edges)
 
@@ -8,9 +8,9 @@
 
 ## Overview
 
-The ingestion pipeline for the Nutanix RAG knowledge base. It scans markdown/text/HTML/PDF files from the source document repository, chunks them intelligently, extracts rich metadata, embeds them via Jina AI, stores them in LanceDB (`nutanix_rag_v3_dedup`), and updates the Kuzu graph DB (`nutanix_graph_v3`).
+The ingestion pipeline for the Nutanix RAG knowledge base. The active batch script scans markdown/text/HTML, code, and PDF files from the source document repository, chunks them intelligently, extracts rich metadata, embeds them via Jina AI, and stores them in LanceDB (`nutanix_rag_v3_dedup`). Kuzu graph DB updates (`nutanix_graph_v3`) run only when `SYNC_TO_KUZU=true`.
 
-The primary per-file script is `embed_one.py`. `embed_pipeline_v3.py` handles batch embedding of many files at once. `tagger_v3.py` provides inline metadata extraction (products, ecosystem entities, versions). `kuzu_writer.py` handles per-chunk MiniMax entity extraction and writes both LanceDB and Kuzu.
+The primary per-file script is `embed_one.py`. `embed_pipeline_v3.py` handles batch embedding of many files at once. `tagger_v3.py` provides inline metadata extraction (products, ecosystem entities, versions). `kuzu_writer.py` handles optional per-chunk MiniMax entity extraction and Kuzu writes when `SYNC_TO_KUZU=true`.
 
 **Key change (2026-05-12):** Deduplication at embed time. The pipeline checks each chunk's `chunk_hash` against the LanceDB table BEFORE calling the Jina embedding API — saving API costs on duplicate chunks. Insert uses `merge_insert("chunk_hash")` instead of plain `add()`.
 
@@ -22,7 +22,7 @@ It supports three modes:
 |---|---|---|
 | **Single file** | `python3 embed_one.py <rel_path>` | Embed a single file (preferred for daily updates) |
 | **Batch incremental** | `python3 embed_pipeline_v3.py` | Add/update many files without rebuilding everything |
-| **Full rebuild** | `python3 embed_pipeline_v3.py --clean` | Complete rebuild from scratch (old table backed up first) |
+| **Full rebuild** | `python3 embed_pipeline_v3.py --clean` | Complete rebuild from scratch; refuses to wipe a non-empty table unless `PIPELINE_FORCE_CLEAN=1` is set |
 
 All modes support an optional Kuzu entity sync (see below).
 
@@ -92,17 +92,17 @@ Done. 71,775 records in LanceDB + checkpoint updated.
 
 ## Kuzu Entity Sync (`SYNC_TO_KUZU`)
 
-By default, Kuzu only receives Chunk nodes (graph-to-vector bridge). To enable full entity extraction:
+Current runtime behavior: by default, the active scripts do not write to Kuzu. Set `SYNC_TO_KUZU=true` to enable MiniMax entity extraction and Kuzu writes:
 
 ```bash
 # Single file with entity extraction
-SYNC_TO_KUZU=true python3 embed_one.py portal/foo.pdf
+SYNC_TO_KUZU=true python3 embed_one.py portal/security_advisories/example.txt
 
 # Batch with entity extraction
 SYNC_TO_KUZU=true python3 embed_pipeline_v3.py
 
-# Default (no entity extraction — Chunk nodes only)
-python3 embed_one.py portal/foo.pdf
+# Default (no Kuzu write; LanceDB only)
+python3 embed_one.py portal/security_advisories/example.txt
 python3 embed_pipeline_v3.py
 ```
 
@@ -112,7 +112,7 @@ Entity extraction adds ~1 MiniMax API call per chunk. For a 10-chunk document, e
 
 | Node | Primary Key | Properties |
 |---|---|---|
-| `Chunk` | `chunk_hash` (SHA256) | — |
+| `Chunk` | `chunk_hash` (current implementation: MD5-normalized chunk text) | — |
 | `Entity` | `name` | `display_name`, `entity_type` |
 
 ### Kuzu Relationship Schema
@@ -131,8 +131,8 @@ See `GRAPH_DB.md` for full schema and query patterns.
 | Category | Extensions | Notes |
 |---|---|---|
 | Text | `*.md`, `*.txt`, `*.html` | Standard markdown/text content |
-| Code | `*.py`, `*.go`, `yaml`, `*.yml`, `*.tf`, `*.sh`, `*.php`, `*.js`, `*.json` | GitHub code samples, Terraform, Ansible |
-| PDF | `*.pdf` | Parsed via **Docling** (table-aware) with **markitdown** fallback |
+| Code | `*.py`, `*.go`, `*.yaml`, `*.yml`, `*.tf`, `*.sh`, `*.php`, `*.js`, `*.json` | Active in `embed_pipeline_v3.py`; read as UTF-8 text with errors ignored |
+| PDF | `*.pdf` | Active in `embed_pipeline_v3.py`; parsed with Docling first and markitdown fallback |
 
 ---
 
@@ -157,7 +157,8 @@ The table schema contains:
 |---|---|---|
 | `vector` | float[1024] | Jina embedding |
 | `text` | string | Chunk content |
-| `rel_path` | string | Relative file path (e.g., `portal/foo.pdf`) |
+| `source` | string | Source URL/header when available |
+| `rel_path` | string | Relative file path (e.g. `portal/security_advisories/example.txt`) |
 | `access_level` | string | `public` or `internal` |
 | `doc_type` | string | e.g. `official_doc`, `kb_article`, `battlecard` |
 | `primary_product` | string | e.g. `AHV`, `AOS`, `Prism` |
@@ -167,7 +168,7 @@ The table schema contains:
 | `content_types` | string[] | Taxonomy: api-reference, troubleshooting, etc. |
 | `chunk_index` | int | Position in source document |
 | `content_hash` | string | File-level dedup hash (MD5 of normalized content) |
-| `chunk_hash` | string | Chunk-level dedup hash (SHA256 of normalized chunk text) |
+| `chunk_hash` | string | Chunk-level dedup hash (current implementation: MD5 of normalized chunk text) |
 
 ### Kuzu Graph: `nutanix_graph_v3`
 
@@ -204,23 +205,20 @@ See `GRAPH_DB.md` for full schema and query patterns.
 ### File Discovery
 
 **`get_all_files(root)` / `get_all_markdown_files(root)`**
-- Recursively scans source directory for supported file types
+- Recursively scans source directory for active batch-supported file types: `*.md`, `*.txt`, `*.html`, code extensions, and `*.pdf`
 - Skips: `pipeline/` folder, `__pycache__`, `.git/`, `node_modules`, files < 100 bytes
 - Also skips: `non_advisory_backup.json`, `slack/tc_nkp_kubernetes.txt`, `slack/tc_calm_error.txt`
 - Extracts `Source:` URL from file header if present
-- PDF parsing: Docling (table-aware) → markitdown fallback
-- Returns: `List[Dict]` with `path`, `rel_path`, `source`, `content`, `size`, `is_pdf`
+- Code files are read as text; PDFs are parsed through `parse_pdf()`
+- Returns: `List[Dict]` with `path`, `rel_path`, `source`, `content`, `content_hash`, `size`, `file_type`, `is_pdf`
 
 ### PDF Parsing
 
-**`parse_pdf(pdf_path)`**
-- **Docling (primary):** Table-aware PDF parsing with proper markdown table structure. ML models loaded once and reused for all PDFs in a run.
-- **markitdown (fallback):** Plain text extraction for PDFs when Docling is unavailable or fails.
-- `USE_DOCLING = True` — set to `False` to force markitdown-only.
+`parse_pdf(pdf_path)` uses Docling first for table-aware markdown/text extraction, then falls back to markitdown. If both parsers fail or return empty text, the PDF is skipped by the normal meaningful-content threshold.
 
-### Metadata Extraction (Initial)
+### Metadata Extraction
 
-**`extract_metadata(text, rel_path, source)`** — Initial metadata extraction per chunk:
+**`apply_v3_tags(text, rel_path)`** — V3 metadata extraction applied once per document and copied to chunks:
 
 **Products detected (22 patterns):**
 AOS, AHV, Prism, Flow, Karbon, NKP, NDB, Files, Objects, LCM, Foundation, v4 API, NCI, NC2, Vanguard, Calm, Volumes, Move, Era, NCC, X-Ray, IAM
@@ -230,7 +228,7 @@ api-reference, admin-guide, troubleshooting, release-notes, compatibility, faq, 
 
 ### Chunking
 
-**`split_into_chunks(text, rel_path, source, chunk_tokens=1024, overlap_tokens=100)`**
+**`split_into_chunks(text, max_chars=None, overlap_chars=None)`**
 1. Split on `##` headers — preserves section boundaries
 2. 100 tokens overlap for context continuity
 3. Hard-split fallback for oversized sections
@@ -251,21 +249,20 @@ Batch size: **5 texts per API call**
 
 ### LanceDB Operations
 
-**`init_lancedb_v2(clean=False)`** — Opens or creates `nutanix_rag_v3` table
-**`safe_rebuild_table(files, batch_size=5, test_mode=False)`** — Atomic full rebuild with backup
-**`add_chunks_to_table(table, chunks, embeddings, batch_info)`** — Batch insert
+**`init_lancedb_v3(clean=False)`** — Opens or creates `nutanix_rag_v3_dedup`; `--clean` refuses to delete a non-empty table unless `PIPELINE_FORCE_CLEAN=1` is set
+**`get_existing_chunk_hashes(table)`** — Reads only `chunk_hash` for DB-backed pre-embed dedup
+**`filter_new_chunks(chunks, existing_hashes, seen_hashes)`** — Skips chunks already in LanceDB and duplicates within the current run
+**`add_chunks_to_table(table, chunks, embeddings, rel_path, v3_tags, content_hash)`** — Merges records with `merge_insert("chunk_hash")`
 
-**Index build (post-swap):**
-1. **IVF_HNSW_SQ vector index** — `m=20`, `ef_construction=300`, cosine metric
-2. **FTS index** — on `text` column
-3. **BTree scalar index** — on `chunk_hash`
+**Index note:**
+Existing production DB has vector/FTS/scalar indexes from prior maintenance, but active `embed_pipeline_v3.py` does not currently rebuild or verify indexes after `--clean`. Run a separate index verification/build step before relying on a clean rebuild in production.
 
 ### Checkpoint System
 
-**`processed_files.json`** — crash-resilient incremental processing
-- Updated after every single file — never lost on crash
-- Stores set of already-processed `rel_path` strings
-- On restart: skips files in checkpoint (incremental mode)
+**`processed_files_v3.json`** — crash-resilient incremental processing
+- Updated after every single file
+- Stores `{rel_path: content_hash}`
+- On restart: skips only files whose checkpoint `content_hash` still matches; changed files are processed and DB-backed chunk dedup embeds only new chunks
 
 ---
 
@@ -291,7 +288,6 @@ Batch size: **5 texts per API call**
 | `CHUNK_OVERLAP_TOKENS` | `100` | Overlap between chunks |
 | `CHARS_PER_TOKEN` | `4` | Rough estimate for chunk sizing |
 | `BATCH_SIZE` | `5` | Texts per embed API call |
-| `USE_DOCLING` | `True` | PDF parsing mode |
 | `SYNC_TO_KUZU` | `false` (default) | Set `true` to enable MiniMax entity extraction + Kuzu write |
 
 ---
@@ -301,13 +297,13 @@ Batch size: **5 texts per API call**
 ### Single File (default — LanceDB only, fast)
 
 ```bash
-python3 embed_one.py portal/foo.pdf
+python3 embed_one.py portal/security_advisories/example.txt
 ```
 
 ### Single File (with Kuzu entity extraction)
 
 ```bash
-SYNC_TO_KUZU=true python3 embed_one.py portal/foo.pdf
+SYNC_TO_KUZU=true python3 embed_one.py portal/security_advisories/example.txt
 ```
 
 ### Incremental Batch
@@ -343,9 +339,9 @@ python embed_pipeline_v3.py --test
 | Jina API timeout | Retry once; fall back to LM Studio if retry fails |
 | Jina API error (non-200) | Print error; fall back to LM Studio |
 | LM Studio unavailable | Print warning; skip batch |
-| LanceDB write fails | Exception propagates; checkpoint already saved |
+| LanceDB write fails | Exception propagates before checkpoint update for that file |
 | File read error | Skip file; continue with next |
-| PDF Docling fails | Fall back to markitdown automatically |
+| PDF parsing | Try Docling first; fall back to markitdown; skip PDF if both fail or return too little content |
 | MiniMax entity extraction fails | Retry 3× with exponential backoff; warn + skip chunk, continue pipeline |
 | Kuzu write fails | Retry 3×; warn + skip chunk, continue pipeline |
 | Chunk already in Kuzu | Skip (idempotent MERGE — no duplicate edges) |
@@ -371,7 +367,8 @@ python embed_pipeline_v3.py --test
 
 | Date | Change |
 |---|---|
-| 2026-05-20 | Added `SYNC_TO_KUZU` Kuzu entity extraction via MiniMax LLM. Per-chunk entity extraction writes Entity nodes + `HAS_RELATIONSHIP` + `RELATED_TO` edges to Kuzu inline. Retry 3× with exponential backoff. `kuzu_writer.extract_and_write()` replaces bare `write_chunk_batch()`. Fixed chunk_hash algorithm (SHA256, not MD5). Removed `source` column from schema (not written). Updated Kuzu stats. |
+| 2026-05-24 | Restored active `embed_pipeline_v3.py` discovery for code files and PDFs. PDF parsing uses Docling first with markitdown fallback. Default Kuzu write remains disabled unless `SYNC_TO_KUZU=true`. `chunk_hash` remains MD5, `source` remains in schema, and `--clean` does not rebuild indexes automatically. |
+| 2026-05-20 | Added `SYNC_TO_KUZU` Kuzu entity extraction via MiniMax LLM. Per-chunk entity extraction writes Entity nodes + `HAS_RELATIONSHIP` + `RELATED_TO` edges to Kuzu inline. Retry 3× with exponential backoff. `kuzu_writer.extract_and_write()` replaces bare `write_chunk_batch()`. Updated Kuzu stats. |
 | 2026-05-12 | **Major pipeline overhaul.** Switched to `nutanix_rag_v3_dedup` (85k deduped records). Added pre-embed dedup (checks chunk_hash before Jina API call). Switched to `merge_insert("chunk_hash")` from `table.add()`. Added Kuzu graph integration (Chunk nodes by chunk_hash). Updated vector index to IVF_HNSW_SQ (m=20, ef=300). `embed_one.py` is now the primary embed tool. HPE hardware tagging added to `tagger_v3.py`. |
 | 2026-05-03 | Updated documentation for nutanix_rag_v3 schema, tagger_v3.py enrichment, IvfHnswPq index |
 | 2026-04-23 | Added Docling PDF parsing (table-aware). Added `*.pdf` to supported file types. |
