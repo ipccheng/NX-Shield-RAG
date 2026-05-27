@@ -8,23 +8,23 @@ A Retrieval-Augmented Generation (RAG) knowledge base for Nutanix technical supp
 
 Production-style RAG query using the active LanceDB-centered search path.
 
-**Query:** `"Please provide a comparative summary of VMware Private AI and Nutanix Enterprise AI (NAI)"` *(2026-05-28, active pipeline)*
+**Query:** `"I have a customer currently running a Nutanix cluster. Each node is an NX G9 server equipped with one Broadcom 57416 NIC. They need more network ports, but the 57416 NIC is no longer available for purchase. I want to propose replacing their existing 57416 NICs with the Intel X710-T4L, which is a 4-port Base-T NIC. After physically replacing the NIC cards, what configuration steps do I need to take in Nutanix AOS/Prism?"` *(2026-05-28, active pipeline)*
 
 | Metric | Current RAG result |
 |--------|--------------------|
-| **Query class** | `competitive_comparison` |
-| **Evidence verdict** | **weak** — VMware Private AI evidence was missing or indirect in the top retrieved results |
-| **Query latency** | **10.25s** end-to-end direct script run with Slack/Web fallbacks disabled |
-| **Candidate set** | 169 unique retrieved candidates, reranked top 50 |
-| **Top NAI source** | `google-docs/2026-04-07/NAI All in One Solution Kit For Sellers.txt` — final score 0.746, graph-verified |
-| **Top VMware-side source** | `xpress-md/Broadcom_Compete_Technical_Discovery_Template.md` — final score 0.676, graph-verified; useful but not sufficient for confident VMware Private AI claims |
-| **Answer policy** | Evidence Ledger requires missing competitor-side evidence to be disclosed; unsupported VMware licensing, pricing, roadmap, or bundling claims must be omitted or marked unknown |
+| **Query class** | `networking_production_impacting` |
+| **Evidence verdict** | **review** — production-impacting guidance requires official docs/KB evidence and version/environment caveats |
+| **Query latency** | **13.75s** end-to-end direct script run with Slack/Web fallbacks disabled |
+| **Candidate set** | 62 unique retrieved candidates, reranked top 50 |
+| **Top official doc source** | `portal.nutanix.com/new-docs/01-Hardware-Admin-Product-Mixing.txt` — final score 0.440, graph-verified |
+| **Top KB source** | `portal.nutanix.com/kb/KB-10634.txt` — final score 0.274, graph-verified; contains Intel X710-4P firmware-verification/update context |
+| **Answer policy** | Evidence Ledger requires official docs/KBs for step-by-step operational guidance; graph relevance alone must not be converted into production instructions |
 
 ### What the test shows
 
-The RAG pipeline retrieved strong Nutanix Enterprise AI / NAI material and some VMware/Broadcom competitive context, but it did **not** retrieve enough direct VMware Private AI evidence to support a fully confident competitor-side comparison. The correct answer behavior is therefore to summarize NAI from retrieved sources, include only source-backed VMware context, and explicitly caveat that direct VMware Private AI evidence is weak or missing.
+The RAG pipeline found directly relevant Nutanix hardware/product-mixing documentation and an Intel X710-related KB. Because the question is production-impacting, the Evidence Ledger correctly marks the answer for review: the model should provide a cautious operational checklist, cite the Hardware Admin and KB sources, and call out any items that require validation against the target AOS/hypervisor version and the Compatibility and Interoperability Matrix.
 
-For anything requiring domain accuracy — Nutanix compatibility lists, KB references, lifecycle dates, competitive positioning, licensing, pricing, or roadmap claims — the Evidence Ledger is more important than raw answer fluency. A weak verdict should produce a careful answer with named sources and clear gaps, not a confident but unsupported comparison.
+For anything requiring domain accuracy — Nutanix compatibility lists, KB references, lifecycle dates, production networking, firmware/driver changes, or maintenance procedures — the Evidence Ledger is more important than raw answer fluency. A review verdict should produce a careful answer with named sources, prechecks, maintenance-window guidance, and explicit verification steps.
 
 ---
 
@@ -32,28 +32,28 @@ For anything requiring domain accuracy — Nutanix compatibility lists, KB refer
 
 Kuzu is an **advisory graph DB layer** that walks the entity co-occurrence graph to verify and boost chunks whose tagged entities match structural connections found in the source corpus.
 
-### What Happens on the VMware Private AI vs NAI Query
+### What Happens on the NIC Replacement Query
 
-For `"Please provide a comparative summary of VMware Private AI and Nutanix Enterprise AI (NAI)"`, the active pipeline:
+For the Broadcom 57416 to Intel X710-T4L NIC replacement question, the active pipeline:
 
-1. Walks the Kuzu graph `(Chunk)-[r]->(Entity)` for entities connected to query terms such as VMware, Private AI, Nutanix Enterprise AI, and NAI
-2. Cross-matches graph entity names against LanceDB metadata fields such as `ecosystem_entities` and `mentioned_products`
-3. Boosts graph-verified matches before cross-encoder reranking
-4. Emits an Evidence Ledger verdict so the answer can disclose when one side of a comparison is under-evidenced
+1. Generates deterministic rewrites for the NIC swap and AOS/Prism configuration workflow
+2. Retrieves official Nutanix hardware/product-mixing documentation and Intel X710-related KB evidence
+3. Cross-matches graph entity names against LanceDB metadata fields to boost hardware/NIC-related context
+4. Emits an Evidence Ledger `review` verdict so the answer preserves production-impacting caveats and does not invent unsupported steps
 
 ### Current Test Figures (2026-05-28)
 
 | Metric | Figure |
 |--------|--------|
-| **Retrieved candidates** | 169 unique candidates before reranking |
+| **Retrieved candidates** | 62 unique candidates before reranking |
 | **Rerank scope** | Top 50 candidates reranked |
 | **Graph-verified result set** | 50 reranked results carried graph context |
 | **Graph-authoritative suggestions** | 3 source suggestions attached as advisory context |
-| **Latency** | 10.25s direct script run with Slack/Web fallbacks disabled |
+| **Latency** | 13.75s direct script run with Slack/Web fallbacks disabled |
 
 ### Why It Matters
 
-Vector similarity finds *linguistically similar* chunks. Kuzu finds *structurally related* chunks — documents that frequently mention the same entities together in the source corpus. Combining both signals helps identify related competitive and product-context material, but graph relevance is not answer sufficiency. The Evidence Ledger still decides whether the retrieved sources are strong enough for a confident answer.
+Vector similarity finds *linguistically similar* chunks. Kuzu finds *structurally related* chunks — documents that frequently mention the same hardware, firmware, and platform entities together in the source corpus. Combining both signals helps identify related operational material, but graph relevance is not answer sufficiency. The Evidence Ledger still decides whether the retrieved sources are strong enough for step-by-step production guidance.
 
 See [GRAPH_DB.md](./GRAPH_DB.md) for full schema, entity extraction, and query patterns.
 
