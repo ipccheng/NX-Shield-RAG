@@ -1,0 +1,13 @@
+query_class: <classify the user question>
+verdict: strong | review | weak | blocked
+answer_obligations:
+  - <what must be answered>
+supported_claims:
+  - source_family: <official_docs|kb|validated_design|calculator|...>
+    source_id: <document or tool id>
+    claim: <claim directly supported by the source>
+weak_or_missing_claims:
+  - obligation: <obligation>
+    gap: <what is missing or uncertain>
+answer_rules:
+  - <constraint the final answer must obey>

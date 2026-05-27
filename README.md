@@ -1,78 +1,107 @@
-# NX Shield RAG
+# NX-Shield RAG
 
-A Retrieval-Augmented Generation (RAG) knowledge base for Nutanix technical support. Used by **NX_Shield** to answer Nutanix product, KB, and troubleshooting questions.
+**A field-tested design for building a trustworthy enterprise RAG system — not just a vector search demo.**
 
----
+NX-Shield RAG is a public design notebook for a Nutanix-focused retrieval-augmented generation system. The implementation is private, but the architecture is documented here so other teams can copy the patterns: hybrid retrieval, source authority, graph context, calculator-first tooling, evidence-ledger answer synthesis, and profile-aware MCP serving.
 
-## Architecture
+> If you only remember one idea: **retrieval is not the product; evidence-bound answers are the product.**
 
-![NX_Shield RAG Search Pipeline Architecture](./RAG%20Search%20Pipeline%20Diagram.png)
+## Why this repo exists
 
----
+Most RAG examples stop at "embed documents and ask questions." That is not enough for technical support, presales, or partner-facing answers where hallucinations can cause real operational damage.
 
-## Documents
+This repo documents how NX-Shield RAG is designed to answer questions with:
 
-### 👉 1. [RAG SEARCH PIPELINE](./RAG_SEARCH_PIPELINE.md)
-Full RAG search documentation — covers the active LanceDB-centered query path, LanceDB/Kuzu search layers, deterministic routing, source-family multipliers, calculator-first sizing behavior, Evidence Ledger output, answer guardrails, MCP integration, and historical pipeline lineage.
+- **traceable evidence** instead of ungrounded prose,
+- **multiple retrieval channels** instead of one vector lookup,
+- **source authority and access policy** instead of a flat document pile,
+- **calculator/tool-first paths** when deterministic math beats language-model guessing,
+- **graph context** as structural signal, not as a replacement for evidence,
+- **MCP service boundaries** so multiple agents can share the same RAG safely,
+- **rebuild discipline** so the system can be recreated from private source and public docs.
 
-**Best for:** Understanding how a query moves from user input to formatted response.
+## What is public vs private
 
-### 👉 2. [EMBED PIPELINE](./EMBED_PIPELINE.md)
-Ingestion pipeline documentation — covers smart chunking, metadata extraction (22 products, 8 content types), Jina AI embedding, LanceDB storage, checkpoint system, and the atomic rebuild process.
+This public repository is the **design and rebuild documentation**.
 
-**Best for:** Understanding how source documents are processed, chunked, and loaded into the vector database.
+The private companion repository `ipccheng/NX-Shield-RAG-src` stores the source-recovery bundle: scripts, sanitized prompt/profile files, LaunchAgent templates, and implementation reports. It intentionally excludes secrets and large data stores.
 
-### 👉 3. [METADATA SCHEMA](./METADATA_SCHEMA.md)
-Metadata schema design and structure — covers the 7 metadata fields (access_level, doc_type, primary_product, mentioned_products, ecosystem_entities, versions, content_types), how each field is extracted, the v2 to v3 schema evolution, and how metadata is used in pre-filtering vs reranking.
+| Layer | Public repo | Private source repo | External backups |
+|---|---|---|---|
+| Architecture/design | yes | yes | optional |
+| Rebuild runbook | yes | yes | optional |
+| Scripts/config templates | mapped here | yes | optional |
+| Credentials/tokens | no | no | secure vault only |
+| LanceDB/Kuzu/source-doc data | no | no | backup artifacts only |
+| Private operational logs | no | limited sanitized reports | backup artifacts only |
 
-**Best for:** Understanding how documents are tagged, why the schema was redesigned, and how metadata powers search accuracy.
+## The design in one diagram
 
-### 👉 4. [MCP SETUP](./MCP_SETUP.md)
-MCP server architecture and setup — covers the NX_Shield MCP design, how tool naming works, the `--identity` flag, launchd service configuration, and troubleshooting steps.
+```mermaid
+flowchart TB
+  U[User question] --> G[Agent / MCP client]
+  G --> C[Query classifier]
+  C --> Q[Query variants + obligations]
+  Q --> L[LanceDB hybrid search<br/>vector + FTS + scalar filters]
+  Q --> X[Exact / deterministic lookup]
+  Q --> K[Kuzu graph context<br/>entity and relationship hints]
+  Q --> S[Calculator-first tools<br/>for sizing/math questions]
+  L --> F[RRF + dedup + source diversity]
+  X --> F
+  K --> F
+  S --> F
+  F --> R[Rerank + bounded boosts]
+  R --> E[Evidence Ledger]
+  E --> A[Answer obligations + guardrails]
+  A --> O[Grounded answer or explicit uncertainty]
+```
 
-**Best for:** Understanding how OpenClaw agents connect to the RAG search pipeline via MCP, and how to rebuild the MCP infrastructure from scratch.
+## Start here
 
-### 👉 5. [HINDSIGHT SETUP](./HINDSIGHT_SETUP.md)
-Hindsight app setup and operations — covers Docker Compose architecture (Hindsight + Postgres), backup and restore procedures, environment configuration, and operational notes.
+1. [Architecture overview](docs/design/architecture.md) — the full design at human scale.
+2. [Retrieval pipeline](docs/design/retrieval-pipeline.md) — how a query becomes evidence.
+3. [Evidence-ledger answers](docs/design/evidence-ledger.md) — the answer-quality contract.
+4. [Ingestion and corpus design](docs/build/ingestion-and-corpus.md) — how content should enter the system.
+5. [Rebuild from private source](docs/build/rebuild-from-private-source.md) — how to reconstruct the runtime from docs + private repo.
+6. [Operations model](docs/operate/runtime-and-mcp.md) — profile-aware MCP serving and runtime boundaries.
+7. [Evaluation strategy](docs/evaluate/evaluation-strategy.md) — canaries and regression classes.
 
-**Best for:** Operating and maintaining the Hindsight long-term memory system.
+## Repository map
 
-### 👉 6. [GRAPH DB](./GRAPH_DB.md)
-Kuzu graph database schema, entity extraction, relationship types, and query patterns — covers how entity co-occurrence walks are used to boost RAG retrieval with structural graph signals.
+```text
+.
+├── README.md
+├── docs/
+│   ├── design/       # architecture, retrieval, metadata, evidence, graph, security
+│   ├── build/        # ingestion, rebuild, private-source mapping
+│   ├── operate/      # runtime/MCP and operational playbooks
+│   └── evaluate/     # eval strategy and milestone lineage
+├── diagrams/         # portable Mermaid diagrams
+├── templates/        # implementation-neutral templates
+└── examples/         # example query obligations and answer ledgers
+```
 
-**Best for:** Understanding how Kuzu fits into the query pipeline, what entity types are stored, and how to write graph queries for debugging or extending the boost logic.
+## Design principles
 
----
+- **Evidence before eloquence.** Good style is secondary to source-grounded claims.
+- **Hybrid retrieval by default.** Vector search, lexical search, exact matches, metadata filters, and graph hints solve different failure modes.
+- **Structured uncertainty.** Weak evidence should produce a review/uncertain answer, not confident filler.
+- **Deterministic tools outrank prose.** Storage sizing and arithmetic belong in calculators first, with RAG as supporting context.
+- **Access policy is retrieval logic.** Public, partner, and internal corpora cannot be separated only at the final answer stage.
+- **Graph is advisory.** Kuzu boosts and explains relationships; it does not make unsupported facts true.
+- **Rebuildability matters.** Every major runtime concept should map to a private script/config path and an external data backup requirement.
 
-## Quick Reference
+## What to copy for your own RAG
 
-| Component | Detail |
-|---|---|
-| Vector DB | LanceDB search index (active unified corpus with native + imported evidence) |
-| Embedding | Jina AI `jina-embeddings-v5-text-small` lineage |
-| MCP Tool | `hermes_master_search` via Hermes profile endpoints |
-| Graph DB | Kuzu (`nutanix_graph_v3`) advisory graph context |
-| Intent Routing | Query-class routing + deterministic variants + source-family multipliers |
-| Entity Extraction | tagger/graph lineage — Nutanix products + ecosystem entities |
-| Reranker | jina-reranker-v3 + bounded score/source-family multipliers |
-| Index | FTS on `search_text`; scalar BTree indexes on source-family, confidentiality/scope, migration-lineage, and document/page fields; vector index on `vector` |
-| Answer Policy | Evidence Ledger + Answer Obligations + `answer_rule:` guardrails |
-| Storage Sizing | Calculator-first path; RAG/BOM sources are supporting evidence |
-| Query latency | Varies by query class, reranker, and fallbacks; use current canary/benchmark reports for live numbers |
-| Pipeline | Hermes MCP → query classification → variants/source-family routing → LanceDB hybrid retrieval + Kuzu advisory context + exact matches → calculator-first if sizing → rerank/score → Evidence Ledger → grounded answer context |
-| Agent | NX_Shield |
+If you are building your own enterprise RAG, copy these patterns first:
 
----
+1. **Answer Obligations** — decompose the user question before retrieval.
+2. **Evidence Ledger** — summarize what each source supports before writing the final answer.
+3. **Source Authority** — rank official docs, KBs, design guides, community notes, and chat differently.
+4. **Metadata-first filters** — access level, product, version, source family, and document identity should be queryable fields.
+5. **Canary suites** — evaluate the actual answer path, not only top-k retrieval.
+6. **Private/public split** — publish design docs; keep scripts, data, and credentials in the right place.
 
-## Repo Contents
+## Status
 
-| File | Description |
-|---|---|
-| `README.md` | This file |
-| `RAG_SEARCH_PIPELINE.md` | Active LanceDB-centered RAG search pipeline + historical lineage |
-| `EMBED_PIPELINE.md` | Ingestion pipeline documentation |
-| `METADATA_SCHEMA.md` | Metadata schema design guide |
-| `MCP_SETUP.md` | MCP server architecture |
-| `GRAPH_DB.md` | Kuzu graph DB schema, entity extraction, and query patterns |
-| `HINDSIGHT_SETUP.md` | Hindsight memory system setup |
-| `RAG_Pipeline_Diagram.png` | Architecture diagram |
+This repo intentionally avoids live counts, private hostnames, internal paths, tokens, and operational secrets. Treat all diagrams and paths as design-level unless the rebuild docs explicitly point to the private source bundle.

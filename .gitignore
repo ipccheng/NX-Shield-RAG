@@ -1,0 +1,12 @@
+# This public repo is documentation only.
+.DS_Store
+__pycache__/
+*.pyc
+.env
+.env.*
+auth.json
+*.db
+*.sqlite*
+logs/
+sessions/
+data/
