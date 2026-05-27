@@ -1,6 +1,6 @@
 # NX Shield RAG
 
-A Retrieval-Augmented Generation (RAG) knowledge base for Nutanix technical support. Used by **Sam** and **NX_Shield** to answer Nutanix product, KB, and troubleshooting questions.
+A Retrieval-Augmented Generation (RAG) knowledge base for Nutanix technical support. Used by **NX_Shield** to answer Nutanix product, KB, and troubleshooting questions.
 
 ---
 
@@ -28,7 +28,7 @@ Metadata schema design and structure — covers the 7 metadata fields (access_le
 **Best for:** Understanding how documents are tagged, why the schema was redesigned, and how metadata powers search accuracy.
 
 ### 👉 4. [MCP SETUP](./MCP_SETUP.md)
-MCP server architecture and setup — covers the dual-instance MCP design (Sam vs NX_Shield), how tool naming works, the `--identity` flag, launchd service configuration, and troubleshooting steps.
+MCP server architecture and setup — covers the NX_Shield MCP design, how tool naming works, the `--identity` flag, launchd service configuration, and troubleshooting steps.
 
 **Best for:** Understanding how OpenClaw agents connect to the RAG search pipeline via MCP, and how to rebuild the MCP infrastructure from scratch.
 
@@ -60,7 +60,7 @@ Kuzu graph database schema, entity extraction, relationship types, and query pat
 | Storage Sizing | Calculator-first path; RAG/BOM sources are supporting evidence |
 | Query latency | Varies by query class, reranker, and fallbacks; use current canary/benchmark reports for live numbers |
 | Pipeline | Hermes MCP → query classification → variants/source-family routing → LanceDB hybrid retrieval + Kuzu advisory context + exact matches → calculator-first if sizing → rerank/score → Evidence Ledger → grounded answer context |
-| Agents | Sam, NX_Shield |
+| Agent | NX_Shield |
 
 ---
 
