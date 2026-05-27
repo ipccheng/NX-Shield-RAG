@@ -4,71 +4,56 @@ A Retrieval-Augmented Generation (RAG) knowledge base for Nutanix technical supp
 
 ---
 
-## RAG vs Non-RAG: Real-World Comparison
+## Current RAG Evidence Test
 
-Production data from simultaneous queries — same model, same question, only the retrieval pipeline differs.
+Production-style RAG query using the active LanceDB-centered search path.
 
-**Query:** `"Can you compare Redhat AI with NAI? please give me a summary"` *(2026-05-15, fresh pipeline)*
+**Query:** `"Please provide a comparative summary of VMware Private AI and Nutanix Enterprise AI (NAI)"` *(2026-05-28, active pipeline)*
 
-| Metric | Non-RAG (Direct LLM) | RAG-Grounded |
-|--------|---------------------|--------------|
-| **Query latency** | ~8.1s | **~2.5–6.1s** (avg 2.8s on standard queries; 6.1s on this query with 115 results) |
-| **Top result confidence** | None (no retrieval) | **ce=0.256**, graph-verified |
-| **Answer quality** | Hallucinated — called NAI "Nutanix AI infrastructure solutions" (wrong framing), no citations | Correctly identified NAI = Nutanix AI, sourced from 5 battlecards and summit docs |
-| **Graph verification** | None | 139 entity types confirmed via Kuzu co-occurrence walk |
-| **Sources** | None | 5 battlecards and summit documents (specific filenames not listed) |
+| Metric | Current RAG result |
+|--------|--------------------|
+| **Query class** | `competitive_comparison` |
+| **Evidence verdict** | **weak** — VMware Private AI evidence was missing or indirect in the top retrieved results |
+| **Query latency** | **10.25s** end-to-end direct script run with Slack/Web fallbacks disabled |
+| **Candidate set** | 169 unique retrieved candidates, reranked top 50 |
+| **Top NAI source** | `google-docs/2026-04-07/NAI All in One Solution Kit For Sellers.txt` — final score 0.746, graph-verified |
+| **Top VMware-side source** | `xpress-md/Broadcom_Compete_Technical_Discovery_Template.md` — final score 0.676, graph-verified; useful but not sufficient for confident VMware Private AI claims |
+| **Answer policy** | Evidence Ledger requires missing competitor-side evidence to be disclosed; unsupported VMware licensing, pricing, roadmap, or bundling claims must be omitted or marked unknown |
 
-### Non-RAG hallucination (verbatim):
-> "NAI (Nutanix AI, which typically refers to Nutanix's AI infrastructure solutions)"
+### What the test shows
 
-NAI in the battlecards is **Nutanix AI positioning/marketing** — not a product category. The LLM invented a meaning rather than retrieving the actual battlecard content.
+The RAG pipeline retrieved strong Nutanix Enterprise AI / NAI material and some VMware/Broadcom competitive context, but it did **not** retrieve enough direct VMware Private AI evidence to support a fully confident competitor-side comparison. The correct answer behavior is therefore to summarize NAI from retrieved sources, include only source-backed VMware context, and explicitly caveat that direct VMware Private AI evidence is weak or missing.
 
-### Accuracy vs Speed (updated 2026-05-15)
-
-The 5-channel recomposition pipeline reduced average query latency from ~6–8s to **~2.5–3.5s** — faster than the non-RAG direct API call (~8s) in many cases. Even on this query with 115 matching docs, RAG at 6.1s is competitive with non-RAG at 8.1s.
-
-| Trade-off | Non-RAG | RAG-Grounded |
-|-----------|---------|--------------|
-| Answer accuracy | Unverified (hallucination risk) | Verified against source docs (top result ce=0.256) |
-| Source citation | None | 5 specific battlecard/summit filenames |
-| Graph verification | None | 139 entity types confirmed via Kuzu |
-| Reranking | None | Jina reranker-v3 + 5-channel RRF + Kuzu graph boost |
-| Latency | ~8s | **~2.5–3.5s avg** (5-channel recomposition) |
-
-For anything requiring domain accuracy — Nutanix compatibility lists, KB references, lifecycle dates — the ~2.5–3.5s latency is a worthwhile trade for verified, battlecard-sourced answers.
+For anything requiring domain accuracy — Nutanix compatibility lists, KB references, lifecycle dates, competitive positioning, licensing, pricing, or roadmap claims — the Evidence Ledger is more important than raw answer fluency. A weak verdict should produce a careful answer with named sources and clear gaps, not a confident but unsupported comparison.
 
 ---
 
-## Before & After Kuzu: Adding Structural Entity Verification
+## Graph Context and Evidence Policy
 
-Kuzu was added as a **graph DB layer** that walks the entity co-occurrence graph to verify and boost chunks whose tagged entities match structural connections found in the source corpus.
+Kuzu is an **advisory graph DB layer** that walks the entity co-occurrence graph to verify and boost chunks whose tagged entities match structural connections found in the source corpus.
 
-### What Changed
+### What Happens on the VMware Private AI vs NAI Query
 
-The query `"Can you compare Redhat AI with NAI?"` — **before Kuzu** retrieved 5 results from pure vector + FTS similarity. **After adding Kuzu**, the pipeline additionally:
+For `"Please provide a comparative summary of VMware Private AI and Nutanix Enterprise AI (NAI)"`, the active pipeline:
 
-1. Walks the Kuzu graph `(Chunk)-[r]->(Entity)` for entities connected to query terms (`Red_Hat`, `Nutanix_AI`)
-2. Finds 12 entity nodes in the graph with co-occurrence relationships to those terms
-3. Cross-matches Kuzu entity names against LanceDB `ecosystem_entities` / `mentioned_products` columns
-4. Boosts chunks with graph-verified entity matches by **+0.15 RRF score** before cross-encoder reranking
+1. Walks the Kuzu graph `(Chunk)-[r]->(Entity)` for entities connected to query terms such as VMware, Private AI, Nutanix Enterprise AI, and NAI
+2. Cross-matches graph entity names against LanceDB metadata fields such as `ecosystem_entities` and `mentioned_products`
+3. Boosts graph-verified matches before cross-encoder reranking
+4. Emits an Evidence Ledger verdict so the answer can disclose when one side of a comparison is under-evidenced
 
-### Before vs After (real production query — 2026-05-13)
+### Current Test Figures (2026-05-28)
 
-**Query:** `"Can you compare Redhat AI with NAI? please give me a summary"`
-
-| Metric | Before Kuzu (Vector + FTS only) | After Kuzu (Vector + FTS + Graph Boost) |
-|--------|----------------------------------|----------------------------------------|
-| **Top result** | `Red Hat AI vs Nutanix AI` battlecard (ce=0.199) | `Red Hat AI vs Nutanix AI` battlecard (ce=0.199, **graph-verified**) |
-| **Entity verification** | None — pure embedding similarity | 139 entity types confirmed via Kuzu co-occurrence walk |
-| **Confidence signal** | CE score only | CE score + `_graph_verified` flag + entity tags |
-| **Chunks boosted (+0.15 RRF)** | 0 | 3 chunks |
-| **Graph entities found** | — | **139 entity types** (vs 12 in earlier test) |
-| **Latency overhead** | — | ~100ms (parallel graph walk, no added latency) |
-| **Non-RAG baseline** | Hallucinated — guessed NAI = Nutanix/NVIDIA/National AI, no sources | Same hallucination (unchanged — non-RAG path unaffected by Kuzu) |
+| Metric | Figure |
+|--------|--------|
+| **Retrieved candidates** | 169 unique candidates before reranking |
+| **Rerank scope** | Top 50 candidates reranked |
+| **Graph-verified result set** | 50 reranked results carried graph context |
+| **Graph-authoritative suggestions** | 3 source suggestions attached as advisory context |
+| **Latency** | 10.25s direct script run with Slack/Web fallbacks disabled |
 
 ### Why It Matters
 
-Vector similarity finds *linguistically similar* chunks. Kuzu finds *structurally related* chunks — documents that frequently mention the same entities together in the source corpus. Combining both signals means a query about "Red Hat AI" returns not just docs that *sound like* they're about Red Hat AI, but docs that are *verified by the graph* to be about Red Hat AI because other chunks in the corpus also mention those same entities.
+Vector similarity finds *linguistically similar* chunks. Kuzu finds *structurally related* chunks — documents that frequently mention the same entities together in the source corpus. Combining both signals helps identify related competitive and product-context material, but graph relevance is not answer sufficiency. The Evidence Ledger still decides whether the retrieved sources are strong enough for a confident answer.
 
 See [GRAPH_DB.md](./GRAPH_DB.md) for full schema, entity extraction, and query patterns.
 
