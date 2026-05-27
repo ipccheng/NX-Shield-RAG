@@ -79,14 +79,11 @@ CREATE REL TABLE RELATED_TO(
 );
 ```
 
-### Node Counts (as of 2026-05-12)
+### Dynamic Graph Size
 
-| Node Type | Count |
-|---|---|
-| Entity | 48,483 |
-| Chunk | 72,488 |
-| HAS_RELATIONSHIP edges | 334,800 |
-| RELATED_TO edges | 334,800 |
+Node and edge counts are intentionally omitted from this architecture document because the graph is rebuilt and refreshed over time. Verify live graph size directly from Kuzu when an operational count is needed.
+
+**Caveat:** graph relevance is structural evidence, not answer sufficiency. The answer path must still use the Evidence Ledger and source-backed claim rules before making recommendations.
 
 ---
 
@@ -115,7 +112,7 @@ This is the **source of truth** for the graph. It contains MiniMax API extractio
 
 ### 2. LanceDB (for chunk_hash validation)
 
-When building the graph, only chunks that exist in `nutanix_rag_v3_dedup` are included. The vault may reference chunk_hashes that were removed during deduplication — these are filtered out.
+When building or rebuilding the graph, chunk identity is validated against the active LanceDB lineage. The current search index imports historical evidence while preserving `legacy_v3_chunk_hash`, so graph lookups still bridge through chunk hashes back to LanceDB metadata. The vault may reference chunk_hashes that were removed during deduplication — these are filtered out.
 
 ### 3. Entities Referenced in Relationships Only
 
@@ -134,12 +131,12 @@ Some entities appear in relationship rows but NOT in the vault's `entities` list
 
 ### What the Build Does
 
-1. **Loads valid chunk_hashes** from LanceDB `nutanix_rag_v3_dedup`
+1. **Loads valid chunk_hashes** from the active LanceDB search index
 2. **Parses the vault JSONL** — flattens nested lists, collects entities and relationships
 3. **Creates Kuzu schema** — Entity, Chunk nodes + HAS_RELATIONSHIP, RELATED_TO edges
-4. **Bulk loads entities** via CSV `COPY FROM` (fast, 48k entities in seconds)
-5. **Bulk loads chunks** via CSV `COPY FROM` (72k chunks in seconds)
-6. **Batch inserts relationships** — 334k edges in batches of 300 via `MATCH-CREATE`. Each edge inserts two relationships (Chunk→Entity via HAS_RELATIONSHIP, Entity→Entity via RELATED_TO). Takes ~10 minutes.
+4. **Bulk loads entities** via CSV `COPY FROM`
+5. **Bulk loads chunks** via CSV `COPY FROM`
+6. **Batch inserts relationships** via `MATCH-CREATE`. Each edge inserts two relationships (Chunk→Entity via HAS_RELATIONSHIP, Entity→Entity via RELATED_TO). Runtime depends on graph size.
 7. **Backfills missing entities** — any entity referenced in relationships but excluded from the vault's entity list gets added.
 
 ### Key Scripts
@@ -208,6 +205,18 @@ RETURN DISTINCT c.chunk_hash;
 
 ---
 
+### Relationship Semantics Cleanup (K17)
+
+The graph has useful relationship labels/properties, but `r.rel_type` is not fully populated. Query code and future graph rebuilds should normalize relationship semantics as:
+
+```text
+relationship_type = r.rel_type if present else relationship label/type
+```
+
+Do not treat a missing `rel_type` property as proof that no relationship exists.
+
+---
+
 ## Embed Pipeline Integration
 
 When new documents are embedded via `embed_one.py`, the following flow occurs:
@@ -251,7 +260,7 @@ ps aux | grep kuzu
 
 ### Slow Relationship Insertion
 
-Inserting 334k edges via `MATCH-CREATE` takes ~10-15 minutes. If it's too slow:
+Large relationship inserts via `MATCH-CREATE` can take time. If rebuilds are too slow:
 
 1. Increase batch size from 300 to 500
 2. Check WAL growth — Kuzu checkpoints periodically, a large WAL slows writes

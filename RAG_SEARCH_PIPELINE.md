@@ -1,134 +1,85 @@
-# NX_Shield RAG Pipeline — Architecture & Documentation
+# NX_Shield RAG Search Pipeline
 
-> **Last updated:** 2026-05-24
-> **Status:** Active
-> **Script:** `nutanix_rag_search.py` (workspace/scripts/)
-> **MCP Backend:** `universal_gateway_mcp.py` → `nutanix_rag_search.py` subprocess via `subprocess.run()`
+> **Last updated:** 2026-05-27
+> **Status:** Active — Hermes LanceDB-centered search path
+> **Primary script:** `nutanix_rag_search.py`
+> **MCP tool:** `hermes_master_search`
 
 ---
 
 ## Overview
 
-This document describes the Nutanix technical knowledge base RAG (Retrieval-Augmented Generation) pipeline used by **Sam**, **Neo**, and **NX_Shield** to answer Nutanix product, KB, and troubleshooting questions.
+This document describes the Nutanix technical knowledge-base RAG search pipeline used by **Sam** and **NX_Shield** through Hermes MCP. The active search path is centered on **LanceDB**, combining native portal/page evidence with imported historical evidence families such as KB, Google Docs, xpress, team-chat, and legacy chunk sources.
 
-The pipeline performs intent classification + query recomposition via DeepSeek, then runs parallel embedding and multi-channel search. **Two routing modes:**
+Key additions since the v3-only pipeline:
 
-- **[SINGLE]** — generates 3 linguistic rewrites of the original query; each rewrite acts as a tiebreaker at low weight (0.3)
-- **[COMPARISON]** — decomposes "A vs B" / "differences between X and Y" queries into 2–4 distinct sub-queries, one per product or approach; each sub-query runs as a primary search at full weight (1.0) with both Vector and FTS
+- **LanceDB-centered corpus:** active unified search index with explicit migration lineage.
+- **Hermes MCP tool naming:** `hermes_master_search` for both Sam/default and NX_Shield profile endpoints.
+- **Evidence Ledger / Answer Obligations:** formatted output now exposes query class, weak-evidence notes, missing evidence, and answer obligations.
+- **`answer_rule:` guardrails:** source-traceable claims, missing-evidence disclosure, and caution for competitive/licensing/pricing/roadmap claims.
+- **Calculator-first sizing:** storage sizing/BOM questions emit a deterministic calculator block before using RAG as supporting context.
+- **Kuzu GraphContext:** graph verification and distance-2 source suggestions remain advisory; graph relevance is not treated as answer sufficiency.
 
-Ripgrep runs in parallel with the RAG search. Fallback waterfall: Slack CLI → SearXNG web search on low confidence.
+The older v3 13-stage pipeline below is retained as lineage because the active path imports historical evidence and keeps many of the same routing/reranking concepts.
 
 ---
 
 ## System Architecture
 
-### High-Level Flow
+![NX_Shield RAG Search Pipeline](./RAG%20Search%20Pipeline%20Diagram.png)
 
-```
-QUERY
- │
- ▼
- ┌──────────────────────────────────────────────────────────────┐
- │  PARALLEL Stage 1 (ThreadPoolExecutor, max_workers=3)       │
- │  1. DeepSeek topic classify                                 │
- │  2. LLM routing — generate_routing() → intent + queries    │
- │  3. Kuzu graph walk (entity co-occurrence)                 │
- └──────────────────────────────────────────────────────────────┘
- │
- ▼
- jina_embed_batch([orig + 3 variants])  ← 1 API call
- │
- ▼
- ┌──────────────────────────────────────────────────────────────┐
- │  PARALLEL Stage 2 (search channels, ThreadPoolExecutor)   │
- │                                                              │
- │  [SINGLE] mode:                                             │
- │    Channel 1: Original → Vector search    (weight=1.0)      │
- │    Channel 2: Original → FTS search       (weight=1.0)     │
- │    Channel 3–5: Rewrites 1–3 → Vector   (weight=0.3 each) │
- │                                                              │
- │  [COMPARISON] mode:                                         │
- │    Original → de-prioritised (weight=0.3)                   │
- │    Each sub-query ×2: Vector (1.0) + FTS (1.0)            │
- │                                                              │
- │  → rrf_merge(channel_weights=[...])                         │
- │    Accumulation key: chunk_hash (not source)                │
- │    Source diversity after CE rerank, not before rerank      │
- └──────────────────────────────────────────────────────────────┘
- │
- ▼
- FALLBACK RETRY (if < 3 unique results) — security-only filter
- │
- ▼
- GRAPH BOOST (Kuzu entity co-occurrence)
-   +0.15 to rrf_score for graph-verified docs
- │
- ▼
- expand_for_rerank (±2 neighbor chunks via t.to_arrow())
- │
- ▼
- CROSS-ENCODER RERANK (Jina reranker-v3, top 50→5)
- │
- ▼
- score_multiplier() — KB#, subcategory, products, mentioned_products
- │
- ▼
- CONFIDENCE FILTER (CE score < 0.1 AND mult ≤ 1.0 → discard)
- │
- ▼
- FALLBACK WATERFALL (if low confidence)
-   → query_slack_fallback() via slk CLI
-   → query_web_search() via SearXNG direct HTTP
- │
- ▼
- ripgrep (parallel with RAG — not in pipeline, fed to format_results)
- │
- ▼
- format_results() → LLM-readable output
+### Active High-Level Flow
+
+```text
+User query
+  → Hermes MCP profile endpoint (`hermes_master_search`)
+  → query classifier / deterministic routing
+  → query variants and source-family multipliers
+  → LanceDB hybrid retrieval (vector + FTS + RRF)
+  → Kuzu GraphContext advisory signal
+  → exact local keyword matches as supporting context
+  → calculator-first path for storage sizing/BOM
+  → rerank + score + confidence filtering
+  → Evidence Ledger / Answer Obligations / answer_rule guardrails
+  → grounded LLM-readable answer context
 ```
 
 ---
 
-## LanceDB Table (nutanix_rag_v3_dedup)
+## Active LanceDB Search Index
 
-- **Path:** `~/.openclaw/memory/lancedb-pro/nutanix_rag_v3_dedup.lance`
-- **Rows:** ~71,765 (deduplicated from ~129K — dedup ran 2026-05-14)
-- **Size:** ~1.2 GB
-- **Embedding:** Jina AI `jina-embeddings-v5-text-small` (1024 dims)
-- **Indexes:** IVF_HNSW_SQ vector index (metric=cosine, m=20, ef=300), BM25 FTS index, BTree on scalar columns
+The core of the RAG search architecture is LanceDB. The current implementation uses the active unified corpus, but the architecture should be understood as **LanceDB-centered retrieval** rather than as a version-specific design.
 
-**Schema:**
+- **Role:** core vector + FTS + scalar metadata search index
+- **Embedding lineage:** Jina AI `jina-embeddings-v5-text-small`
+- **Key index families:** FTS on `search_text`; scalar indexes for source family, confidentiality/scope, migration lineage, and document/page identifiers; vector index on `vector`
+- **Lineage:** native evidence plus imported historical evidence families
 
-| Field | Type | Description |
-|---|---|---|
-| `text` | string | Chunk content, ~8000 chars per chunk |
-| `vector` | float[1024] | Jina embedding |
-| `source` | string | Full URL or file path |
-| `rel_path` | string | Relative file path |
-| `access_level` | string | `public` or `internal` |
-| `doc_type` | string | e.g. `official_doc`, `kb_article`, `battlecard` |
-| `primary_product` | string | e.g. `AHV`, `AOS`, `Prism`, `General` |
-| `mentioned_products` | string[] | Nutanix products found in text |
-| `ecosystem_entities` | string[] | Competitors/partners (VMware, Red_Hat, etc.) |
-| `versions` | string[] | e.g. `["AOS_7.5"]` |
-| `content_types` | string[] | e.g. `["troubleshooting", "architecture"]` |
-| `chunk_index` | int | Position in source document (`None` for unchunked docs) |
-| `content_hash` | string | File-level dedup hash |
-| `chunk_hash` | string | Chunk-level dedup hash |
+Stable data-quality points from K17:
+
+| Field | Verified state |
+|---|---|
+| `chunk_hash` | populated and unique in the active unified corpus |
+| `unique_chunk_key` | populated and unique in the active unified corpus |
+| `source_family` | populated for routing/filtering |
+| `confidentiality` | populated for access/scope filtering |
+| `migration_source` | distinguishes native vs imported lineage |
+| `content_hash` | known P0 cleanup item on legacy rows |
+| `section_id` | known P1 cleanup item on imported rows |
 
 ---
 
 ## Query Paths
 
-All agents route through the same MCP gateway on their respective host:
+Sam and NX_Shield use Hermes MCP profile endpoints that expose the same canonical tool name while allowing profile-specific service configuration.
 
-| Agent | MCP Tool | Host | Identity | Rate Limit |
-|---|---|---|---|---|
-| Neo | `neo__master_search` | MacBook :8010 | `neo` | 3 calls/turn |
-| Sam | `sam-gateway__master_search` | Mac mini :8010 | `sam` | 3 calls/turn |
-| NX_Shield | `gateway-mcp__master_search` | Mac mini :8010 | `nx_shield` (public only) | 2 calls/turn |
+| Consumer | MCP Tool | Service role | Notes |
+|---|---|---|---|
+| Sam/default | `hermes_master_search` | primary Hermes RAG search endpoint | active LanceDB path |
+| NX_Shield | `hermes_master_search` | dedicated NX_Shield RAG search endpoint | active LanceDB path; full-docs access approved by owner |
+| Storage sizing | storage calculator MCP tools | shared calculator endpoint | calculator-first for BOM/sizing questions |
 
-All MCP servers run `universal_gateway_mcp.py` → `nutanix_rag_search.py` subprocess via Python `subprocess.run()`.
+All RAG MCP services call `nutanix_rag_search.py` as the search subprocess and return formatted evidence for the model to synthesize from.
 
 ---
 
@@ -178,7 +129,7 @@ Three operations run simultaneously:
 - Extracts entities connected to query terms via `(Chunk)-[r]->(Entity)` relationships
 - Entity names match LanceDB's `ecosystem_entities` / `mentioned_products` columns
 - Used for Graph Boost in Stage S6
-- **Verified data:** 71,765 Chunk nodes, 49,075 Entity nodes, 336,886 HAS_RELATIONSHIP edges
+- Dynamic node/edge counts are intentionally omitted from architecture docs; verify live graph size from Kuzu when needed.
 
 ### S2 — Batch Embedding (jina_embed_batch)
 
@@ -351,35 +302,44 @@ Recommended next optimizations:
 
 | Component | Host | Notes |
 |---|---|---|
-| LanceDB + search | MacBook + Mac mini | `nutanix_rag_v3_dedup`, synced via rsync |
-| Kuzu graph DB | MacBook + Mac mini | `nutanix_graph_v3` — embedded library, opened in-process per query (no daemon) |
-| DeepSeek API | Cloud | Topic classification + query routing |
-| Jina Embed API | Cloud (api.jina.ai) | Batch vectorization (4 vectors/call) |
-| Jina Rerank API | Cloud (api.jina.ai) | Semantic reranking |
-| SearXNG | Mac mini (:8888) | Web search fallback — direct HTTP |
-| Slack | MacBook | `slk search` CLI subprocess (direct call) |
-| OpenClaw gateway | MacBook + Mac mini | Agent orchestration |
+| LanceDB + search | Hermes RAG host(s) | active unified search index with native + imported evidence |
+| Kuzu graph DB | Hermes RAG host(s) | `nutanix_graph_v3` — embedded advisory graph; relationship semantics cleanup tracked in K17 |
+| Jina Embed/Rerank API | Cloud (api.jina.ai) | Query embedding lineage and semantic reranking |
+| Storage calculator MCP | Hermes RAG host(s) | deterministic Nutanix storage sizing for BOM/capacity questions |
+| SearXNG / web fallback | Local service where configured | fallback only when confidence/evidence is insufficient |
+| Slack / exact local matches | Local tools where configured | supporting context; answer must still disclose weak or missing evidence |
+| Hermes gateway/profiles | Sam + NX_Shield profiles | agent orchestration and MCP discovery |
 
 ---
 
 ## LanceDB Backup
 
-The LanceDB database is included in the daily OpenClaw backup (3 AM). Backup tar archives `~/.openclaw/` which contains both the LanceDB directory and source document repository.
+The active LanceDB store should be backed up as part of the Hermes/Nutanix RAG backup process. Keep old historical/rollback stores until explicit cleanup approval after a soak period.
 
-**Manual backup:**
+**Manual backup pattern:**
 ```bash
-tar -czf ~/rag_backups/nutanix_rag_v3_dedup-$(date +%Y%m%d).tar.gz \
-  ~/.openclaw/memory/lancedb-pro/nutanix_rag_v3_dedup.lance/
+# Resolve the active LanceDB path from the running RAG service configuration,
+# then archive that directory with a date-stamped filename.
+tar -czf ~/rag_backups/nutanix_lancedb_active-$(date +%Y%m%d).tar.gz \
+  /path/to/active/lancedb/store/
 ```
 
 **Restore:**
 ```bash
-tar -xzf YYYYMMDD-openclaw-backup.tar.gz -C /Users/ipccheng/
+tar -xzf YYYYMMDD-nutanix_lancedb_active.tar.gz -C /restore/root/
 ```
 
 ---
 
 ## Changelog
+
+### 2026-05-27 — LanceDB-centered RAG search docs + diagram rename
+- **Documentation rename** — `RAG_PIPELINE_ARCHITECTURE.md` is now `RAG_SEARCH_PIPELINE.md` to describe the active search path more clearly.
+- **Diagram rename** — `RAG v3 Pipeline Diagram.png` is now `RAG Search Pipeline Diagram.png`.
+- **Active LanceDB path** — documented LanceDB as the central search index, with native + imported evidence lineage and stable metadata fields.
+- **Answer policy** — documented Evidence Ledger, Answer Obligations, weak-evidence notes, and `answer_rule:` guardrails.
+- **Calculator-first sizing** — documented deterministic storage sizing/BOM path with RAG as supporting context.
+- **K17 roadmap** — documented current schema/data-quality findings and side-by-side rebuild stance.
 
 ### 2026-05-24 — Milestone 5 Performance Instrumentation + Channel Cleanup
 - **Timing instrumentation** — added `[TIMING]` JSON output for guard, DB open, parallel prep, embedding, Stage 2 search, graph boost, context expansion, rerank, postprocess, and total.
@@ -393,7 +353,7 @@ tar -xzf YYYYMMDD-openclaw-backup.tar.gz -C /Users/ipccheng/
 - **generate_routing()** — replaces generate_rewrites(): single-pass DeepSeek call returns `{intent, queries}` dict; zero extra latency
 - **[SINGLE] mode** — 3 linguistic rewrites as tiebreakers (0.3 weight); 5-channel search unchanged from prior doc
 - **[COMPARISON] mode** — decomposes "A vs B" queries into 2–4 sub-queries; each runs Vector + FTS at 1.0; original query de-prioritised to 0.3
-- **Kuzu** — confirmed working as embedded library (no daemon). Database verified: 71,765 Chunk nodes, 49,075 Entity nodes, 336,886 HAS_RELATIONSHIP edges
+- **Kuzu** — confirmed working as embedded library (no daemon). Dynamic graph counts are intentionally omitted from architecture docs.
 - **Slack fallback** — corrected from MCP reference to direct `slk search` CLI subprocess call
 - **Web fallback** — clarified as direct HTTP to SearXNG (:8888), not MCP
 - **S3 channel weights** — documented mode-dependent weights; COMPARISON mode skips fixed 5-channel assumption
@@ -414,4 +374,4 @@ tar -xzf YYYYMMDD-openclaw-backup.tar.gz -C /Users/ipccheng/
 
 ### 2026-05-12 — Kuzu Graph Integration
 - Added Kuzu graph DB for entity-based boosting
-- Deduplication: ~129K → ~85K chunks
+- Deduplication: historical rebuild reduced duplicate chunk records; verify current count live when needed

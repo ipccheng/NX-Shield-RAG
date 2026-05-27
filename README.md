@@ -76,14 +76,14 @@ See [GRAPH_DB.md](./GRAPH_DB.md) for full schema, entity extraction, and query p
 
 ## Architecture
 
-![NX_Shield RAG Pipeline Architecture](https://github.com/ipccheng/rag-pipeline/blob/main/RAG%20v3%20Pipeline%20Diagram.png)
+![NX_Shield RAG Search Pipeline Architecture](./RAG%20Search%20Pipeline%20Diagram.png)
 
 ---
 
 ## Documents
 
-### 👉 1. [RAG PIPELINE ARCHITECTURE](./RAG_PIPELINE_ARCHITECTURE.md)
-Full pipeline documentation — covers the query processing flow, LanceDB schema, intent-based dynamic filter routing, entity extraction, cross-encoder reranking, score multipliers, confidence thresholds, MCP server integration, runtime infrastructure, and LanceDB backup.
+### 👉 1. [RAG SEARCH PIPELINE](./RAG_SEARCH_PIPELINE.md)
+Full RAG search documentation — covers the active LanceDB-centered query path, LanceDB/Kuzu search layers, deterministic routing, source-family multipliers, calculator-first sizing behavior, Evidence Ledger output, answer guardrails, MCP integration, and historical pipeline lineage.
 
 **Best for:** Understanding how a query moves from user input to formatted response.
 
@@ -118,19 +118,19 @@ Kuzu graph database schema, entity extraction, relationship types, and query pat
 
 | Component | Detail |
 |---|---|
-| Vector DB | LanceDB (`nutanix_rag_v3_dedup` — ~1.2 GB, ~71.7K chunks) |
-| Embedding | Jina AI `jina-embeddings-v5-text-small` (1024 dims) |
-| Topic Classifier | DeepSeek (cloud, primary) / Gemma 4 31B (local fallback) |
-| Graph DB | Kuzu (`nutanix_graph_v3` — ~71K Chunk nodes, ~49K Entity nodes) |
-| Intent Routing | Keyword + entity-based dynamic filter construction |
-| Entity Extraction | tagger_v3 — 22 Nutanix products + 24 ecosystem entities |
-| Reranker | jina-reranker-v3 (Jina AI, listwise, top 50→5) |
-| Index | IvfHnswPq vector + FTS + scalar (access_level, doc_type, primary_product) |
-| Chunk size | 1024 tokens / 100 token overlap |
-| DB size | **~71,756 chunks** / ~1.2 GB (deduplicated) |
-| Query latency | **~2.5–3.5s avg** (warm, 10-query benchmark); ~6s on heavy queries |
-| Pipeline | 13-stage: parallel (classify+rewrites+Kuzu) → batch embed → 5-channel search (orig Vec + orig FTS + 3× rewrite Vec) → RRF + chunk_hash dedup → graph boost → expand → rerank → score → confidence filter → ripgrep → format + fallback |
-| Agents | Sam, NX_Shield (Discord bot) |
+| Vector DB | LanceDB search index (active unified corpus with native + imported evidence) |
+| Embedding | Jina AI `jina-embeddings-v5-text-small` lineage |
+| MCP Tool | `hermes_master_search` via Hermes profile endpoints |
+| Graph DB | Kuzu (`nutanix_graph_v3`) advisory graph context |
+| Intent Routing | Query-class routing + deterministic variants + source-family multipliers |
+| Entity Extraction | tagger/graph lineage — Nutanix products + ecosystem entities |
+| Reranker | jina-reranker-v3 + bounded score/source-family multipliers |
+| Index | FTS on `search_text`; scalar BTree indexes on source-family, confidentiality/scope, migration-lineage, and document/page fields; vector index on `vector` |
+| Answer Policy | Evidence Ledger + Answer Obligations + `answer_rule:` guardrails |
+| Storage Sizing | Calculator-first path; RAG/BOM sources are supporting evidence |
+| Query latency | Varies by query class, reranker, and fallbacks; use current canary/benchmark reports for live numbers |
+| Pipeline | Hermes MCP → query classification → variants/source-family routing → LanceDB hybrid retrieval + Kuzu advisory context + exact matches → calculator-first if sizing → rerank/score → Evidence Ledger → grounded answer context |
+| Agents | Sam, NX_Shield |
 
 ---
 
@@ -139,7 +139,7 @@ Kuzu graph database schema, entity extraction, relationship types, and query pat
 | File | Description |
 |---|---|
 | `README.md` | This file |
-| `RAG_PIPELINE_ARCHITECTURE.md` | Query pipeline + backup documentation |
+| `RAG_SEARCH_PIPELINE.md` | Active LanceDB-centered RAG search pipeline + historical lineage |
 | `EMBED_PIPELINE.md` | Ingestion pipeline documentation |
 | `METADATA_SCHEMA.md` | Metadata schema design guide |
 | `MCP_SETUP.md` | MCP server architecture |

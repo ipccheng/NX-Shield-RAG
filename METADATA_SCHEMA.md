@@ -2,13 +2,45 @@
 
 ## Overview
 
-Each chunk in the LanceDB RAG database carries metadata extracted during the embedding pipeline. The metadata serves two purposes: **filtering** (pre-search narrowing by product/type) and **ranking** (boosting documents by relevance to the query intent).
-
-The schema covers two concerns: filtering and ranking. Core fields: `access_level`, `doc_type`, `primary_product`, `mentioned_products`, `ecosystem_entities` — plus practical additions for versioning and content type detection.
+Each chunk or page in the RAG database carries metadata used for **filtering**, **ranking**, **lineage**, and **answer-policy disclosure**. The historical v3 schema focused on `access_level`, `doc_type`, `primary_product`, `mentioned_products`, and `ecosystem_entities`. The active LanceDB search index keeps that lineage while adding richer source-family, confidentiality, migration, and page/document metadata.
 
 ---
 
-## Schema Fields
+## Active LanceDB Schema Snapshot (verified 2026-05-27)
+
+| Item | Value |
+|---|---|
+| Search index | LanceDB active unified corpus |
+| Table name | version-specific implementation detail |
+| Index families | vector, full-text search, scalar metadata filters |
+| `chunk_hash` | populated and unique in the active corpus |
+| `unique_chunk_key` | populated and unique in the active corpus |
+
+Important active metadata fields:
+
+| Field | Purpose |
+|---|---|
+| `migration_source` | distinguishes native rows from imported lineage |
+| `legacy_v3_chunk_hash` | preserves historical chunk lineage for imported evidence |
+| `legacy_rel_path` / lineage path fields | preserves source path lineage where historical field names differ from current fields |
+| `source_family` | routes broad evidence families such as portal, KB, Google Docs, xpress, team chat, and historical imports |
+| `confidentiality` / `access_scope` | access/scope filtering |
+| `search_text` | FTS target used by active search |
+| `unique_chunk_key` | active unique row key |
+
+Known K17 roadmap items:
+
+| Priority | Item | Direction |
+|---|---|---|
+| P0 | `content_hash` gaps on legacy rows | side-by-side rebuild with `content_hash_v2` |
+| P1 | missing `document_id`, sparse `section_id` | deterministic document/section IDs |
+| P2 | missing parent/child context fields | parent/child chunking for context expansion |
+| P3 | missing normalized product/version/source-authority fields | add `products`, `versions`, `source_authority`, `authority_score` |
+| P4 | index changes | benchmark before adding indexes; current scalar filters are already fast |
+
+---
+
+## Historical v3 Schema Fields
 
 | Field | Type | Description |
 |---|---|---|

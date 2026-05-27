@@ -1,81 +1,98 @@
-# MCP Server Setup — Nutanix RAG Pipeline
+# MCP Server Setup — Nutanix RAG Search
 
-> **Last updated:** 2026-05-16
-> **Status:** Active — Updated to reflect current `universal_gateway_mcp.py` architecture
+> **Last updated:** 2026-05-27
+> **Status:** Active — Hermes MCP profile endpoints with LanceDB-centered RAG search
 
 ---
 
 ## Overview
 
-Two MCP servers run as system daemons on Mac mini, serving Nutanix RAG search to OpenClaw agents. Each agent (Sam and NX_Shield) has its own MCP server instance with identity-based access control, both running `universal_gateway_mcp.py` as the backend.
+Hermes profiles expose the Nutanix RAG search pipeline through MCP. Sam/default and NX_Shield use separate RAG service endpoints so each profile can be verified and restarted independently, while both expose the canonical MCP tool name:
+
+```text
+hermes_master_search
+```
+
+Storage sizing is handled by a separate calculator MCP service. For capacity/BOM questions, the answer path is calculator-first; RAG provides supporting source/BOM context.
 
 ---
 
 ## Architecture
 
-```
-OpenClaw Gateway
-│
-├── Sam (agent:main)
-│   └── tool: sam-gateway__master_search
-│       └── HTTP SSE → universal_gateway_mcp.py (port 8011, identity=sam)
-│           └── spawns: nutanix_rag_search.py --identity sam
-│               ├── Jina embed + LanceDB hybrid search
-│               ├── Kuzu graph walk (parallel)
-│               ├── ripgrep /opt/homebrew/bin/rg (parallel)
-│               └── Slack → SearXNG fallback waterfall
-│
-└── NX_Shield (agent:nutanix_shield)
-    └── tool: gateway-mcp__master_search
-        └── HTTP SSE → universal_gateway_mcp.py (port 8010, identity=nx_shield)
-            └── spawns: nutanix_rag_search.py --identity nx_shield
-                └── Same pipeline, hard-filtered to access_level='public'
+```text
+Hermes profile: Sam/default
+└── MCP server: nutanix-rag-search
+    └── tool: hermes_master_search
+        └── RAG service endpoint → universal_gateway_mcp.py
+            └── spawns: nutanix_rag_search.py
+                ├── LanceDB hybrid retrieval
+                ├── Kuzu GraphContext advisory signal
+                ├── exact local keyword matches
+                ├── Evidence Ledger / answer_rule output
+                └── optional fallback search when confidence is low
+
+Hermes profile: NX_Shield
+└── MCP server: nutanix-rag-search
+    └── tool: hermes_master_search
+        └── dedicated NX_Shield RAG service endpoint
+            └── same active answer path
+
+Shared storage calculator MCP
+└── tools: storage_calc_forward, storage_calc_reverse, model/config helpers
 ```
 
 ---
 
 ## Design Decisions
 
-### Why `universal_gateway_mcp.py` instead of calling the script directly?
+### Why separate RAG service endpoints?
 
-`universal_gateway_mcp.py` is a thin SSE-to-subprocess bridge. It wraps `nutanix_rag_search.py` as a subprocess and exposes it as an MCP tool. Benefits:
+1. **Profile isolation** — Sam/default and NX_Shield can be tested and restarted independently.
+2. **Operational rollback** — each LaunchAgent/service can keep its own backup and environment flags.
+3. **Endpoint-locality clarity** — profile MCP discovery can pass while a dedicated service still points to stale backend settings; each endpoint must be directly canaried.
+4. **Answer-path parity** — both endpoints should emit Evidence Ledger, `answer_rule:` guardrails, and calculator-first sizing behavior.
 
-1. **Protocol translation** — OpenClaw speaks MCP/SSE; `nutanix_rag_search.py` speaks plain stdout JSON
-2. **Identity enforcement at the gateway layer** — each MCP server instance has its own `--identity` baked in at launchd startup
-3. **Session-aware rate limiting** — `_check_and_increment()` uses session file mtime to track calls per session turn
-4. **Timeout isolation** — each query runs in its own subprocess with a 90s timeout; crashes don't bring down the server
+### Why `hermes_master_search`?
 
-### Why separate MCP servers for Sam and NX_Shield?
+Hermes native MCP prefixes the server name around the tool name. The underlying tool is intentionally named `hermes_master_search` so all profiles expose a clear, consistent Nutanix RAG search tool.
 
-1. **Identity isolation** — Sam (`identity=sam`) sees all content; NX_Shield (`identity=nx_shield`) is hard-filtered to `access_level='public'` at the LanceDB query level
-2. **Independent rate limits** — `gateway_config.json` (`max_calls_per_session`) allows 5 calls/query turn for all agents
-3. **Separate process** — a crash in one doesn't affect the other
+### NX_Shield access stance
 
-### Sam bypasses MCP and calls the script directly?
-
-**No.** Sam uses `sam-gateway__master_search` via the MCP server on port 8011.
+NX_Shield currently uses owner-approved full-docs RAG access for NDA-covered users. Do not infer a public-only external policy from old `access_level='public'` documentation. If the audience/policy changes later, rerun canaries that prove internal/confidential source families are excluded for that profile.
 
 ---
 
-## Port Assignments
+## Conceptual Port Assignments
 
-| Port | Server Name (openclaw.json) | Script | Identity | rerank_top | Used By |
-|------|----------------------------|--------|----------|------------|---------|
-| 8010 | `gateway-mcp` | `universal_gateway_mcp.py` | `nutanix_shield` | 5 | NX_Shield |
-| 8011 | `sam-gateway` | `universal_gateway_mcp.py` | `sam` | 5 | Sam |
+| Service role | Tool | Endpoint role | Notes |
+|---|---|---|---|
+| Sam/default RAG | `hermes_master_search` | primary RAG search service | active LanceDB path |
+| NX_Shield RAG | `hermes_master_search` | dedicated NX_Shield RAG service | active LanceDB path and separately canaried |
+| Storage calculator | `storage_calc_*` tools | shared calculator service | calculator-first sizing/BOM math |
+
+Avoid publishing private host/IP/token details in this public documentation. Use local profile config and LaunchAgent records as the operational source of truth.
 
 ---
 
 ## MCP Tool Names
 
-The tool name format is `{server_name}__{tool_name}` (double underscore):
+Hermes profile config should discover:
 
-| Server | Tool Name | Full Qualified Name |
-|--------|-----------|-------------------|
-| `sam-gateway` | `master_search` | `sam-gateway__master_search` |
-| `gateway-mcp` | `master_search` | `gateway-mcp__master_search` |
+| MCP server | Tool Name | Purpose |
+|---|---|---|
+| `nutanix-rag-search` | `hermes_master_search` | RAG + ripgrep + optional fallback search |
+| `nutanix-storage-calc` | `storage_calc_forward` / `storage_calc_reverse` / helpers | deterministic Nutanix storage sizing |
 
-Sam's `sam-gateway__master_search` tool is the one referenced in `IDENTITY.md` as the mandatory first-resort tool for Nutanix technical questions.
+Verification pattern:
+
+```bash
+hermes --profile sam mcp test nutanix-rag-search
+hermes --profile sam mcp test nutanix-storage-calc
+hermes --profile nx-shield mcp test nutanix-rag-search
+hermes --profile nx-shield mcp test nutanix-storage-calc
+```
+
+Direct endpoint canaries should also check for Evidence Ledger, `answer_rule:` markers, calculator-first storage sizing, and absence of stale fallback markers.
 
 ---
 
@@ -211,7 +228,7 @@ If `MAX_CALLS_EXCEEDED` is returned, the agent must compile its answer from resu
 ### 2026-05-12
 - Updated LanceDB table name: `nutanix_rag_v3` → `nutanix_rag_v3_dedup`
 - Added Kuzu graph DB integration for entity-based boosting
-- Updated row count: ~130K → ~85K (deduplicated)
+- Documented deduplicated LanceDB lineage without static row counts
 - Added Graph Boost section explaining entity matching with Kuzu
 
 ### 2026-05-05
