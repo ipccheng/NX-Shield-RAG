@@ -109,7 +109,7 @@ The normal path is local evidence first. Slack and Web are waterfall fallbacks, 
 
 ### Measured sample runs
 
-The table below aligns the six conceptual phases with two local-RAG measurements of the same sample query, both with Slack and Web fallbacks disabled. These are example execution traces, not fixed benchmarks.
+The table below aligns the six conceptual phases with two v4 local-RAG measurements of the same sample query, both with Slack and Web fallbacks disabled. These are example execution traces, not fixed benchmarks.
 
 ```text
 Sample query: VCF 9.1 vs Nutanix AOS 7.5 comparison
@@ -119,9 +119,8 @@ Fallbacks: Slack disabled, Web disabled
 
 | Path | Flow summary | Planning behavior | Local retrieval behavior | Measured latency |
 | --- | --- | --- | --- | ---: |
-| **Legacy/current path** | Guard → LLM route generation → LLM topic classification → Kuzu graph lookup → route embeddings → LanceDB vector/FTS fan-out → RRF/context expansion/rerank. | Two query-time router LLM calls dominated the run. In the measured MiniMax path, routing and classification were serialized while graph lookup ran alongside them. | `COMPARISON` mode created `4` routes and up to `8` LanceDB channels, with `314` candidates before rerank and a rerank pool of `50`. | `24.0128s` total; `18.6647s` in `parallel_prep`; embedding `1.2166s`; LanceDB channels `0.2828s`; rerank `3.6347s` |
 | **v4 single-query path** | Guard → v4 backend → original-query FTS + vector search → RRF → identity filter. | No query-time router LLM and no Kuzu graph lookup in the v4 fast path. | Fastest path, but one broad query can over-focus on one side of a comparison and surface metadata-like matches. | `1.26–2.39s` across three local runs |
-| **v4 deterministic comparison path** | Guard → v4 backend → deterministic comparison routes → per-route FTS + vector search → RRF → route-coverage pass → identity filter. | No query-time router LLM. Explicit comparison markers trigger deterministic routes for each product side plus a combined comparison route and the original query. | Preserves both VCF/Broadcom and AOS/Nutanix evidence in the final set, while filtering known metadata/noise files. | `3.42s` local direct run; still far below the legacy LLM-planning run |
+| **v4 deterministic comparison path** | Guard → v4 backend → deterministic comparison routes → per-route FTS + vector search → RRF → route-coverage pass → identity filter. | No query-time router LLM. Explicit comparison markers trigger deterministic routes for each product side plus a combined comparison route and the original query. | Preserves both VCF/Broadcom and AOS/Nutanix evidence in the final set, while filtering known metadata/noise files. | `3.42s` local direct run |
 
 Top evidence items from the v4 deterministic comparison run:
 
@@ -156,7 +155,6 @@ Latency controls:
 - bounded route count,
 - no default query-time LLM planner in the v4 comparison path,
 - route-level FTS/vector retrieval with RRF fusion,
-- parallel graph lookup and exact keyword search where the legacy path is used,
 - capped candidate fetch and rerank pools,
 - context expansion only for fused top candidates,
 - fallback waterfall so Slack/Web are skipped when local evidence is strong.
