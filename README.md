@@ -106,6 +106,39 @@ The normal path is local evidence first. Slack and Web are waterfall fallbacks, 
 - Slack search is attempted only when local RAG and exact keyword evidence are weak or missing. It is useful for field notes, but lower authority than official docs.
 - Web search is the final fallback and is constrained to allowed domains. It is useful for current public vendor pages or release notes when the local corpus lacks coverage.
 
+### Measured sample run
+
+The table below aligns the measured pipeline timing with the six conceptual phases above. This was one local-RAG run of the sample query with Slack and Web fallbacks disabled, so it should be read as an example execution trace rather than a fixed benchmark.
+
+```text
+Mode: COMPARISON
+Routes: 4
+Channels: 8
+Candidates before rerank: 314
+Rerank pool: 50
+Final evidence items: 5
+Total local RAG latency: 24.0128s
+```
+
+| README phase | What happens in this sample query | Evidence / scoring output | Booster / ranking behavior | Measured latency |
+| --- | --- | --- | --- | ---: |
+| **1. Classify and plan** | Prompt guard runs, then the query is classified as a competitive/comparison query. The router extracts product/version entities such as `VCF 9.1`, `VMware Cloud Foundation`, `AOS 7.5`, and `Nutanix AOS`, then creates up to four bounded routes. | Routing mode: `COMPARISON`; routes: `4`; topics observed include `LICENSING`, `CLUSTER_SIZING`, `STORAGE_EFFICIENCY`, and `FOUNDATION_IMAGING`. | Original full query is preserved at lower weight; product-specific comparison routes are weighted higher. Topic weights later influence RRF and post-rerank scoring. | `18.6647s`, shared with Phase 3 as `parallel_prep` |
+| **2. Retrieve from local evidence first** | Batched embeddings are generated for the four route queries. LanceDB runs vector plus FTS retrieval per route, producing up to eight local retrieval channels. Exact/ripgrep side search also runs as a lexical safety net. | `314` chunk-level candidates before rerank. | Vector search provides semantic recall; FTS anchors exact product/version terms; route weights carry into RRF. | Embedding: `1.2166s`; LanceDB channels: `0.2828s`; LanceDB open: `0.0013s` |
+| **3. Add graph context, but do not let graph become truth** | Kuzu graph lookup surfaces entity and relationship hints related to AOS, AHV, Prism, VCF, ESXi/vSphere, lifecycle, and storage concepts. | `540` graph entity types verified. All final top-five evidence items carried graph annotation. | Graph matches add bounded structural signal; graph does not create factual claims by itself. | Graph lookup is included in `parallel_prep`; graph boost application: `0.0146s` |
+| **4. Fuse with RRF, then rerank** | Vector, FTS, and graph-annotated candidates are fused. Top fused candidates get nearby chunk context, then a cross-encoder reranks the top 50. | Rerank pool: `50`; final top evidence scores ranged from `0.732` to `0.200`. | RRF combines independent channels; chunk-level dedup prevents duplicate crowding; source/metadata multipliers are capped; source diversity is applied after rerank. | Context expansion: `0.1958s`; rerank: `3.6347s`; postprocess: `0.0022s`; RRF is included inside search-channel timing |
+| **5. Build the Evidence Ledger** | Retrieved evidence is converted into supported claims, weak or missing claims, and answer rules before final answer synthesis. | Top evidence included Broadcom/VMware material, Nutanix competitive material, and AOS 7.5 portal evidence. | Weak coverage for exact `VCF 9.1` or exact `AOS 7.5` claims should be marked rather than overgeneralized. | Not separately timed in current instrumentation |
+| **6. Use Slack or Web only as fallbacks** | Fallbacks are skipped when local evidence is strong enough. In this measurement, both were explicitly disabled to isolate local RAG latency. | No Slack or Web evidence included. | Slack is lower-authority field/community signal; Web is the final allowed-domain fallback for current public sources. Neither should override stronger local official evidence. | `0s` in this run because `--no-slack-search --no-web-search` was used |
+
+Top evidence items from this measured run:
+
+| Rank | Source | Graph annotation | Cross-encoder score | Final score |
+| ---: | --- | --- | ---: | ---: |
+| 1 | `broadcom-vmware/broadcom_vmware_converted.md` | yes | `0.554` | `0.732` |
+| 2 | `xpress-md/Competitive_Cheat_Sheet_for_Nutanix_vs_VMware.md` | yes | `0.327` | `0.360` |
+| 3 | `xpress-md/Broadcom_Compete_Technical_Discovery_Template.md` | yes | `0.249` | `0.273` |
+| 4 | `xpress-md/Nutanix_Advantage_vs_Dell_VxRail_-_Competitive_Brief.md` | yes | `0.223` | `0.246` |
+| 5 | `portal/AOS/vSphere-Admin6-AOS-v7_5_vSphere-Admin6-AOS-v7_5.txt` | yes | `0.137` | `0.200` |
+
 ### Techniques used to improve accuracy and latency
 
 Accuracy controls:
