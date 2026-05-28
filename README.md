@@ -33,13 +33,14 @@ This is a comparison query, so the RAG path is deliberately different from a sin
 ### 1. Classify and plan
 
 - Run a prompt-injection guard before retrieval.
-- Classify the query as a competitive/comparison question with product/version entities such as `VCF 9.1`, `VMware Cloud Foundation`, `AOS 7.5`, and `Nutanix AOS`.
+- Detect explicit comparison intent from markers such as `vs`, `versus`, `compare`, `comparison`, or `difference between`.
+- Extract search-only product/version aliases such as `VCF 9.1`, `VMware Cloud Foundation`, `Broadcom`, `AOS 7.5`, and `Nutanix AOS`.
 - Build answer obligations: compare architecture, lifecycle/upgrade model, operations, storage/virtualization assumptions, ecosystem dependencies, and caveats.
-- Generate bounded query routes. In the current design, comparison routing preserves the original question at low weight and creates up to four focused routes, for example:
-  - original full comparison question, low weight,
-  - `VMware Cloud Foundation VCF 9.1 architecture operations lifecycle`,
-  - `Nutanix AOS 7.5 architecture operations lifecycle`,
-  - combined comparison route with expanded aliases.
+- In the v4 path, avoid a query-time LLM planner for obvious comparison queries. Instead, use deterministic bounded routes so latency is predictable and both product sides are represented. For this sample, routes are shaped as:
+  - `VMware Cloud Foundation VCF 9.1 Broadcom`,
+  - `Nutanix AOS 7.5`,
+  - `VMware Cloud Foundation VCF 9.1 Broadcom Nutanix AOS 7.5 comparison migration competitive analysis`,
+  - the original full comparison question.
 
 ### 2. Retrieve from local evidence first
 
@@ -106,45 +107,40 @@ The normal path is local evidence first. Slack and Web are waterfall fallbacks, 
 - Slack search is attempted only when local RAG and exact keyword evidence are weak or missing. It is useful for field notes, but lower authority than official docs.
 - Web search is the final fallback and is constrained to allowed domains. It is useful for current public vendor pages or release notes when the local corpus lacks coverage.
 
-### Measured sample run
+### Measured sample runs
 
-The table below aligns the measured pipeline timing with the six conceptual phases above. This was one local-RAG run of the sample query with Slack and Web fallbacks disabled, so it should be read as an example execution trace rather than a fixed benchmark.
+The table below aligns the six conceptual phases with two local-RAG measurements of the same sample query, both with Slack and Web fallbacks disabled. These are example execution traces, not fixed benchmarks.
 
 ```text
-Mode: COMPARISON
-Routes: 4
-Channels: 8
-Candidates before rerank: 314
-Rerank pool: 50
+Sample query: VCF 9.1 vs Nutanix AOS 7.5 comparison
 Final evidence items: 5
-Total local RAG latency: 24.0128s
+Fallbacks: Slack disabled, Web disabled
 ```
 
-| README phase | What happens in this sample query | Evidence / scoring output | Booster / ranking behavior | Measured latency |
+| Path | Flow summary | Planning behavior | Local retrieval behavior | Measured latency |
 | --- | --- | --- | --- | ---: |
-| **1. Classify and plan** | Prompt guard runs, then the query is classified as a competitive/comparison query. The router extracts product/version entities such as `VCF 9.1`, `VMware Cloud Foundation`, `AOS 7.5`, and `Nutanix AOS`, then creates up to four bounded routes. | Routing mode: `COMPARISON`; routes: `4`; topics observed include `LICENSING`, `CLUSTER_SIZING`, `STORAGE_EFFICIENCY`, and `FOUNDATION_IMAGING`. | Original full query is preserved at lower weight; product-specific comparison routes are weighted higher. Topic weights later influence RRF and post-rerank scoring. | `18.6647s`, shared with Phase 3 as `parallel_prep` |
-| **2. Retrieve from local evidence first** | Batched embeddings are generated for the four route queries. LanceDB runs vector plus FTS retrieval per route, producing up to eight local retrieval channels. Exact/ripgrep side search also runs as a lexical safety net. | `314` chunk-level candidates before rerank. | Vector search provides semantic recall; FTS anchors exact product/version terms; route weights carry into RRF. | Embedding: `1.2166s`; LanceDB channels: `0.2828s`; LanceDB open: `0.0013s` |
-| **3. Add graph context, but do not let graph become truth** | Kuzu graph lookup surfaces entity and relationship hints related to AOS, AHV, Prism, VCF, ESXi/vSphere, lifecycle, and storage concepts. | `540` graph entity types verified. All final top-five evidence items carried graph annotation. | Graph matches add bounded structural signal; graph does not create factual claims by itself. | Graph lookup is included in `parallel_prep`; graph boost application: `0.0146s` |
-| **4. Fuse with RRF, then rerank** | Vector, FTS, and graph-annotated candidates are fused. Top fused candidates get nearby chunk context, then a cross-encoder reranks the top 50. | Rerank pool: `50`; final top evidence scores ranged from `0.732` to `0.200`. | RRF combines independent channels; chunk-level dedup prevents duplicate crowding; source/metadata multipliers are capped; source diversity is applied after rerank. | Context expansion: `0.1958s`; rerank: `3.6347s`; postprocess: `0.0022s`; RRF is included inside search-channel timing |
-| **5. Build the Evidence Ledger** | Retrieved evidence is converted into supported claims, weak or missing claims, and answer rules before final answer synthesis. | Top evidence included Broadcom/VMware material, Nutanix competitive material, and AOS 7.5 portal evidence. | Weak coverage for exact `VCF 9.1` or exact `AOS 7.5` claims should be marked rather than overgeneralized. | Not separately timed in current instrumentation |
-| **6. Use Slack or Web only as fallbacks** | Fallbacks are skipped when local evidence is strong enough. In this measurement, both were explicitly disabled to isolate local RAG latency. | No Slack or Web evidence included. | Slack is lower-authority field/community signal; Web is the final allowed-domain fallback for current public sources. Neither should override stronger local official evidence. | `0s` in this run because `--no-slack-search --no-web-search` was used |
+| **Legacy/current path** | Guard → LLM route generation → LLM topic classification → Kuzu graph lookup → route embeddings → LanceDB vector/FTS fan-out → RRF/context expansion/rerank. | Two query-time router LLM calls dominated the run. In the measured MiniMax path, routing and classification were serialized while graph lookup ran alongside them. | `COMPARISON` mode created `4` routes and up to `8` LanceDB channels, with `314` candidates before rerank and a rerank pool of `50`. | `24.0128s` total; `18.6647s` in `parallel_prep`; embedding `1.2166s`; LanceDB channels `0.2828s`; rerank `3.6347s` |
+| **v4 single-query path** | Guard → v4 backend → original-query FTS + vector search → RRF → identity filter. | No query-time router LLM and no Kuzu graph lookup in the v4 fast path. | Fastest path, but one broad query can over-focus on one side of a comparison and surface metadata-like matches. | `1.26–2.39s` across three local runs |
+| **v4 deterministic comparison path** | Guard → v4 backend → deterministic comparison routes → per-route FTS + vector search → RRF → route-coverage pass → identity filter. | No query-time router LLM. Explicit comparison markers trigger deterministic routes for each product side plus a combined comparison route and the original query. | Preserves both VCF/Broadcom and AOS/Nutanix evidence in the final set, while filtering known metadata/noise files. | `3.42s` local direct run; still far below the legacy LLM-planning run |
 
-Top evidence items from this measured run:
+Top evidence items from the v4 deterministic comparison run:
 
-| Rank | Source | Graph annotation | Cross-encoder score | Final score |
-| ---: | --- | --- | ---: | ---: |
-| 1 | `broadcom-vmware/broadcom_vmware_converted.md` | yes | `0.554` | `0.732` |
-| 2 | `xpress-md/Competitive_Cheat_Sheet_for_Nutanix_vs_VMware.md` | yes | `0.327` | `0.360` |
-| 3 | `xpress-md/Broadcom_Compete_Technical_Discovery_Template.md` | yes | `0.249` | `0.273` |
-| 4 | `xpress-md/Nutanix_Advantage_vs_Dell_VxRail_-_Competitive_Brief.md` | yes | `0.223` | `0.246` |
-| 5 | `portal/AOS/vSphere-Admin6-AOS-v7_5_vSphere-Admin6-AOS-v7_5.txt` | yes | `0.137` | `0.200` |
+| Rank | Source | Why it matters |
+| ---: | --- | --- |
+| 1 | `VCF_9_Transition_Technical_Impact_Guide.md` | VCF-side transition and technical-impact evidence. |
+| 2 | `API-Ref-AOS-v7_5_api-comments-api-auto-r.html.txt` | AOS 7.5-specific local corpus evidence. |
+| 3 | `Broadcom_Compete_Technical_Discovery_Template.md` | Broadcom/VMware competitive-discovery context. |
+| 4 | `Advanced-Admin-AOS-v7_5_app-app-key-comp-ahv-virtualization-aos-c.html.txt` | AOS/AHV-side operational evidence. |
+| 5 | `5d9c8931-006e-4ed7-8457-ff4540c1b005.md` | Additional VMware/Broadcom comparison context. |
+
+Decision from this comparison: **do not add a combined classification + routing LLM call to v4 by default.** The v4 problem for comparison queries was coverage balance, not planner latency. Deterministic multi-route decomposition gives the main quality improvement without adding LLM round trips, JSON parsing risk, retry behavior, or provider-specific failure modes.
 
 ### Techniques used to improve accuracy and latency
 
 Accuracy controls:
 
-- query classification plus deterministic keyword fallback,
-- comparison-specific query decomposition,
+- deterministic comparison detection for explicit `vs` / `compare` questions,
+- comparison-specific query decomposition without a default query-time planner LLM,
 - alias expansion for acronyms and product names,
 - hybrid vector + full-text retrieval,
 - scalar access/source filters,
@@ -158,9 +154,9 @@ Accuracy controls:
 Latency controls:
 
 - bounded route count,
-- batched embeddings for all route queries,
-- concurrent LanceDB channel searches,
-- parallel graph lookup and exact keyword search,
+- no default query-time LLM planner in the v4 comparison path,
+- route-level FTS/vector retrieval with RRF fusion,
+- parallel graph lookup and exact keyword search where the legacy path is used,
 - capped candidate fetch and rerank pools,
 - context expansion only for fused top candidates,
 - fallback waterfall so Slack/Web are skipped when local evidence is strong.
