@@ -20,7 +20,7 @@ This repo documents how NX-Shield RAG is designed to answer questions with:
 - **MCP service boundaries** so multiple agents can share the same RAG safely,
 - **rebuild discipline** so the system can be recreated from private source and public docs.
 
-## Sample query path: VCF 9.1 vs AOS 7.5
+## Sample query path
 
 Example user question:
 
