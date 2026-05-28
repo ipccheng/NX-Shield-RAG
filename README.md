@@ -26,6 +26,8 @@ Example user question:
 
 > Can you provide a detailed comparison of VMware Cloud Foundation (VCF) 9.1 and Nutanix AOS 7.5?
 
+![NX-Shield RAG sample query path for VCF 9.1 vs AOS 7.5](diagrams/sample-query-path-vcf-aos.png)
+
 This is a comparison query, so the RAG path is deliberately different from a single factual lookup. The goal is not only to retrieve chunks, but to produce balanced evidence for both products and make weak coverage visible before answer generation.
 
 ### 1. Classify and plan
