@@ -4,27 +4,32 @@ The retrieval pipeline is designed to answer hard technical questions where the 
 
 ## Query flow
 
+The current v4 path keeps the latency-sensitive retrieval logic deterministic where possible. Query-time LLM planning is not required for obvious exact-KB, limit/fact, or explicit comparison queries. Those classes use bounded route construction and metadata-aware ranking instead.
+
 ```mermaid
 sequenceDiagram
   participant User
   participant Agent
   participant MCP as RAG MCP Tool
-  participant Classifier
+  participant Planner as Deterministic router
   participant LanceDB
+  participant Exact as Exact/Ripgrep path
   participant Kuzu
   participant Calc as Calculator
   participant Ledger
 
   User->>Agent: Ask question
   Agent->>MCP: hermes_master_search(query)
-  MCP->>Classifier: classify + obligations
-  Classifier->>LanceDB: hybrid vector/FTS/scalar search
-  Classifier->>Kuzu: entity/relationship hints
-  Classifier->>Calc: deterministic sizing/math if needed
+  MCP->>Planner: classify intent + build bounded routes
+  Planner->>LanceDB: vector + FTS + scalar-filtered channels
+  Planner->>Exact: exact identifiers / lexical safety net
+  Planner->>Kuzu: graph context when useful
+  Planner->>Calc: deterministic sizing/math if needed
   LanceDB-->>MCP: candidate evidence
-  Kuzu-->>MCP: structural context
+  Exact-->>MCP: exact lexical evidence
+  Kuzu-->>MCP: structural hints
   Calc-->>MCP: computed result + assumptions
-  MCP->>Ledger: fuse, rerank, summarize support
+  MCP->>Ledger: RRF, dedup, bounded boosts, weak-evidence notes
   Ledger-->>Agent: evidence packet + answer rules
   Agent-->>User: grounded answer or uncertainty
 ```
@@ -82,6 +87,8 @@ A useful pipeline should not just concatenate results. NX-Shield uses these idea
 - **Deduplication** by chunk/document identity so one source does not crowd the result set.
 - **Source diversity** so official docs, KBs, design guides, and related references can coexist.
 - **Bounded boosts** so metadata/source authority helps ranking without overpowering actual relevance.
+- **Exact-identity promotion** for KB-only lookups, because an exact KB query is an identity search before it is a semantic search.
+- **Comparison-collateral routing** for explicit comparison questions, so competitive/battlecard evidence can appear alongside official product evidence instead of being buried by Portal-only boosts.
 - **Weak-evidence detection** so one-sided or low-authority evidence triggers caution.
 
 ## Output contract

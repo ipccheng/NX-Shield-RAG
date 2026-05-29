@@ -32,6 +32,20 @@ Recommended service split:
 
 This allows independent restart, logging, policy, and rollback.
 
+## Current public-safe runtime shape
+
+The current deployed shape behind this design is:
+
+- a Hermes-owned Nutanix RAG service using the unified v4 LanceDB corpus,
+- one internal/default MCP service profile,
+- one partner/NX-Shield-style MCP service profile with stricter access-policy checks,
+- the same service-side tool concept, `hermes_master_search`, exposed through each profile,
+- retrieval-time stale-KB policy rather than destructive deletion,
+- deterministic routing for exact KB, limit/fact, and explicit comparison queries,
+- optional graph/backfill context kept separate from the LanceDB schema contract.
+
+Public docs intentionally omit local ports, hostnames, LaunchAgent labels, and private filesystem paths. Those belong in the private source-recovery repo and operational backups.
+
 ## Runtime checks
 
 A healthy runtime is not proven by "the process is running." Verify:

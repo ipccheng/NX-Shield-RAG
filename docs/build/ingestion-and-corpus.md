@@ -64,6 +64,8 @@ A mature RAG store usually needs:
 - scalar indexes for source family/access/product/version,
 - stable identity fields for deduplication.
 
+The current unified v4 LanceDB contract uses one embedding vector column, one lexical `search_text` column, and scalar indexes over identity, source, access, version, and lineage fields. The public-safe schema is documented in [LanceDB schema](../design/lancedb-schema.md).
+
 Benchmark before adding indexes. Index churn without measured need can complicate rebuilds.
 
 ## Private source mapping

@@ -87,7 +87,9 @@ The final answer should cover those obligations only when evidence supports them
 
 ### LanceDB-centered corpus
 
-LanceDB is the center because it holds the searchable corpus and metadata used by vector, lexical, scalar, and source-policy filters. The active implementation uses a unified corpus concept: native/current rows plus transformed legacy evidence with lineage metadata.
+LanceDB is the center because it holds the searchable corpus and metadata used by vector, lexical, scalar, and source-policy filters. The active setup uses a unified v4 corpus concept: native/current rows plus transformed legacy evidence with lineage metadata. The public-safe table contract is documented in [LanceDB schema](lancedb-schema.md).
+
+The important implementation detail is not the live row count; it is the contract: every row must carry source authority, access policy, product/version metadata, stable identity, search text, an embedding vector, and lineage. This lets the runtime prefer official Portal refresh rows, preserve exact KB lookups, route comparison queries to competitive collateral when appropriate, and still keep older migrated evidence auditable.
 
 ### Kuzu graph context
 

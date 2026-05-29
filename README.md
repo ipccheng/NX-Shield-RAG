@@ -185,10 +185,12 @@ flowchart TB
 1. [Architecture overview](docs/design/architecture.md) — the full design at human scale.
 2. [Retrieval pipeline](docs/design/retrieval-pipeline.md) — how a query becomes evidence.
 3. [Evidence-ledger answers](docs/design/evidence-ledger.md) — the answer-quality contract.
-4. [Ingestion and corpus design](docs/build/ingestion-and-corpus.md) — how content should enter the system.
-5. [Rebuild from private source](docs/build/rebuild-from-private-source.md) — how to reconstruct the runtime from docs + private repo.
-6. [Operations model](docs/operate/runtime-and-mcp.md) — profile-aware MCP serving and runtime boundaries.
-7. [Evaluation strategy](docs/evaluate/evaluation-strategy.md) — canaries and regression classes.
+4. [Metadata and corpus design](docs/design/metadata-and-corpus.md) — source authority, access policy, and lineage.
+5. [LanceDB schema](docs/design/lancedb-schema.md) — the public-safe shape of the active unified v4 corpus.
+6. [Ingestion and corpus design](docs/build/ingestion-and-corpus.md) — how content should enter the system.
+7. [Rebuild from private source](docs/build/rebuild-from-private-source.md) — how to reconstruct the runtime from docs + private repo.
+8. [Operations model](docs/operate/runtime-and-mcp.md) — profile-aware MCP serving and runtime boundaries.
+9. [Evaluation strategy](docs/evaluate/evaluation-strategy.md) — canaries and regression classes.
 
 ## Repository map
 
@@ -196,7 +198,7 @@ flowchart TB
 .
 ├── README.md
 ├── docs/
-│   ├── design/       # architecture, retrieval, metadata, evidence, graph, security
+│   ├── design/       # architecture, retrieval, metadata, LanceDB schema, evidence, graph, security
 │   ├── build/        # ingestion, rebuild, private-source mapping
 │   ├── operate/      # runtime/MCP and operational playbooks
 │   └── evaluate/     # eval strategy and milestone lineage

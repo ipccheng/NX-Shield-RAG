@@ -4,17 +4,19 @@ Metadata is not decoration. In an enterprise RAG system, metadata is the control
 
 ## Core fields to model
 
+The active unified v4 corpus uses these field groups. See [LanceDB schema](lancedb-schema.md) for the full public-safe schema contract.
+
 A robust technical-support corpus should include fields like:
 
-- `source_family` — official docs, KB, design guide, validated design, community, team chat, etc.
-- `confidentiality` or `access_level` — public, partner, internal, private.
-- `product` / `products` — normalized product families and aliases.
-- `version` / `versions` — versions mentioned or targeted by the source.
-- `document_id` — stable identity for deduplication and lineage.
-- `section_id` — stable section/page identity.
-- `chunk_hash` / `content_hash` — dedupe and rebuild integrity.
-- `source_authority` — a coarse authority class, not a substitute for relevance.
-- `migration_source` — lineage when old corpora are transformed into a new schema.
+- `source_family` — Portal docs, support KB, validated design, competitive collateral, team chat, Helm/chart, advisory, legacy import, etc.
+- `source_type` — support KB, official documentation, API spec, competitive enablement, field discussion, and similar source-specific types.
+- `source_authority` / `source_authority_score` — coarse authority class plus a bounded numeric signal.
+- `access_scope` / `confidentiality` — public, partner, internal, support-portal, or similar policy classes.
+- `primary_product`, `mentioned_products`, `normalized_versions`, `version_mentions_raw` — product/version metadata for scoped retrieval.
+- `doc_id`, `guide_id`, `page_id`, `section_id` — stable document/page/section identity.
+- `chunk_hash`, `content_hash`, `unique_page_key`, `unique_chunk_key` — dedupe, integrity, and rebuild identity.
+- `text`, `search_text`, `text_markdown`, `vector` — display text, lexical text, Markdown-preserved text, and embedding vector.
+- `legacy_v3_chunk_hash`, `legacy_rel_path`, `legacy_v3_source`, `migration_source` — lineage when old corpora are transformed into the current schema.
 
 ## Why source family matters
 
@@ -30,7 +32,7 @@ The answer layer should know which family each claim came from.
 
 ## Unified corpus concept
 
-The implementation uses a unified-corpus pattern: keep the active query path simple while preserving lineage from multiple generations of content.
+The implementation uses a unified-corpus pattern: keep the active query path simple while preserving lineage from multiple generations of content. The active v4 shape combines native/current evidence and transformed legacy rows in one table contract rather than forcing the runtime to choose between parallel stores.
 
 A row should answer:
 
