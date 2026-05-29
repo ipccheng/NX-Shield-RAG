@@ -122,8 +122,6 @@ Accuracy result: 5/5 sample queries passed
 | --- | --- | --- | --- | ---: |
 | **Hermes v4 post-tuning path** | Guard → v4 backend → exact/official/comparison-aware retrieval channels → RRF → bounded boosts → evidence filtering. | No default query-time router LLM. Exact-KB and explicit comparison queries use deterministic routing and targeted retrieval channels. | Prioritizes official Portal refresh rows, preserves stale KB rows for auditable exact lookups, and adds comparison collateral only for explicit comparison queries. | `1.95s` average / `1.67s` median across five sample queries |
 
-For context, the same five-query sample suite also passed 5/5 on the OpenClaw control path, with `7.163s` average and `8.337s` median latency. In this run, Hermes v4 was about **3.67× faster on average** while matching the control path's sample accuracy.
-
 Decision from this run: **keep the v4 default path deterministic and local-first.** The tuning gains came from retrieval/ranking changes — official-source routing, exact-KB promotion, stale-KB retention-time policy, and comparison-collateral routing — rather than from adding a query-time planner LLM.
 
 ### Techniques used to improve accuracy and latency
