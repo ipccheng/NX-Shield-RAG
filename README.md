@@ -109,30 +109,22 @@ The normal path is local evidence first. Slack and Web are waterfall fallbacks, 
 
 ### Measured sample runs
 
-The table below aligns the six conceptual phases with two v4 local-RAG measurements of the same sample query, both with Slack and Web fallbacks disabled. These are example execution traces, not fixed benchmarks.
+The table below summarizes the current Hermes v4 post-tuning sample run. It is an example execution trace, not a fixed benchmark or service-level objective.
 
 ```text
-Sample query: VCF 9.1 vs Nutanix AOS 7.5 comparison
-Final evidence items: 5
-Fallbacks: Slack disabled, Web disabled
+Sample suite: 5 representative Nutanix RAG queries
+Coverage: live KB retrieval, stale KB preservation, Portal refresh ranking, AHV operations, and cross-product comparison routing
+Fallbacks: local RAG path measured; Slack/Web fallback latency is not included in these local sample figures
+Accuracy result: 5/5 sample queries passed
 ```
 
 | Path | Flow summary | Planning behavior | Local retrieval behavior | Measured latency |
 | --- | --- | --- | --- | ---: |
-| **v4 single-query path** | Guard → v4 backend → original-query FTS + vector search → RRF → identity filter. | No query-time router LLM and no Kuzu graph lookup in the v4 fast path. | Fastest path, but one broad query can over-focus on one side of a comparison and surface metadata-like matches. | `1.26–2.39s` across three local runs |
-| **v4 deterministic comparison path** | Guard → v4 backend → deterministic comparison routes → per-route FTS + vector search → RRF → route-coverage pass → identity filter. | No query-time router LLM. Explicit comparison markers trigger deterministic routes for each product side plus a combined comparison route and the original query. | Preserves both VCF/Broadcom and AOS/Nutanix evidence in the final set, while filtering known metadata/noise files. | `3.42s` local direct run |
+| **Hermes v4 post-tuning path** | Guard → v4 backend → exact/official/comparison-aware retrieval channels → RRF → bounded boosts → evidence filtering. | No default query-time router LLM. Exact-KB and explicit comparison queries use deterministic routing and targeted retrieval channels. | Prioritizes official Portal refresh rows, preserves stale KB rows for auditable exact lookups, and adds comparison collateral only for explicit comparison queries. | `1.95s` average / `1.67s` median across five sample queries |
 
-Top evidence items from the v4 deterministic comparison run:
+For context, the same five-query sample suite also passed 5/5 on the OpenClaw control path, with `7.163s` average and `8.337s` median latency. In this run, Hermes v4 was about **3.67× faster on average** while matching the control path's sample accuracy.
 
-| Rank | Source | Why it matters |
-| ---: | --- | --- |
-| 1 | `VCF_9_Transition_Technical_Impact_Guide.md` | VCF-side transition and technical-impact evidence. |
-| 2 | `API-Ref-AOS-v7_5_api-comments-api-auto-r.html.txt` | AOS 7.5-specific local corpus evidence. |
-| 3 | `Broadcom_Compete_Technical_Discovery_Template.md` | Broadcom/VMware competitive-discovery context. |
-| 4 | `Advanced-Admin-AOS-v7_5_app-app-key-comp-ahv-virtualization-aos-c.html.txt` | AOS/AHV-side operational evidence. |
-| 5 | `5d9c8931-006e-4ed7-8457-ff4540c1b005.md` | Additional VMware/Broadcom comparison context. |
-
-Decision from this comparison: **do not add a combined classification + routing LLM call to v4 by default.** The v4 problem for comparison queries was coverage balance, not planner latency. Deterministic multi-route decomposition gives the main quality improvement without adding LLM round trips, JSON parsing risk, retry behavior, or provider-specific failure modes.
+Decision from this run: **keep the v4 default path deterministic and local-first.** The tuning gains came from retrieval/ranking changes — official-source routing, exact-KB promotion, stale-KB retention-time policy, and comparison-collateral routing — rather than from adding a query-time planner LLM.
 
 ### Techniques used to improve accuracy and latency
 
