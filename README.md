@@ -17,6 +17,7 @@ This repo documents how NX-Shield RAG is designed to answer questions with:
 - **source authority and access policy** instead of a flat document pile,
 - **calculator/tool-first paths** when deterministic math beats language-model guessing,
 - **graph context** as structural signal, not as a replacement for evidence,
+- **weak-evidence disclosure** instead of confident answers from partial coverage,
 - **MCP service boundaries** so multiple agents can share the same RAG safely,
 - **rebuild discipline** so the system can be recreated from private source and public docs.
 
@@ -173,14 +174,15 @@ flowchart TB
 ## Start here
 
 1. [Architecture overview](docs/design/architecture.md) — the full design at human scale.
-2. [Retrieval pipeline](docs/design/retrieval-pipeline.md) — how a query becomes evidence.
-3. [Evidence-ledger answers](docs/design/evidence-ledger.md) — the answer-quality contract.
-4. [Metadata and corpus design](docs/design/metadata-and-corpus.md) — source authority, access policy, and lineage.
-5. [LanceDB schema](docs/design/lancedb-schema.md) — the public-safe shape of the active unified v4 corpus.
-6. [Ingestion and corpus design](docs/build/ingestion-and-corpus.md) — how content should enter the system.
-7. [Rebuild from private source](docs/build/rebuild-from-private-source.md) — how to reconstruct the runtime from docs + private repo.
-8. [Operations model](docs/operate/runtime-and-mcp.md) — profile-aware MCP serving and runtime boundaries.
-9. [Evaluation strategy](docs/evaluate/evaluation-strategy.md) — canaries and regression classes.
+2. [Enterprise RAG strengths](docs/design/enterprise-rag-strengths.md) — what this design adds beyond generic agentic RAG.
+3. [Retrieval pipeline](docs/design/retrieval-pipeline.md) — how a query becomes evidence.
+4. [Evidence-ledger answers](docs/design/evidence-ledger.md) — the answer-quality contract.
+5. [Metadata and corpus design](docs/design/metadata-and-corpus.md) — source authority, access policy, and lineage.
+6. [LanceDB schema](docs/design/lancedb-schema.md) — the public-safe shape of the active unified v4 corpus.
+7. [Ingestion and corpus design](docs/build/ingestion-and-corpus.md) — how content should enter the system.
+8. [Rebuild from private source](docs/build/rebuild-from-private-source.md) — how to reconstruct the runtime from docs + private repo.
+9. [Operations model](docs/operate/runtime-and-mcp.md) — profile-aware MCP serving and runtime boundaries.
+10. [Evaluation strategy](docs/evaluate/evaluation-strategy.md) — canaries and regression classes.
 
 ## Repository map
 
@@ -202,6 +204,7 @@ flowchart TB
 - **Evidence before eloquence.** Good style is secondary to source-grounded claims.
 - **Hybrid retrieval by default.** Vector search, lexical search, exact matches, metadata filters, and graph hints solve different failure modes.
 - **Structured uncertainty.** Weak evidence should produce a review/uncertain answer, not confident filler.
+- **Production controls are part of RAG.** Authority ranking, identity filters, rollout gates, endpoint locality checks, and corpus hygiene are not optional extras; they are what make retrieval safe to operate.
 - **Deterministic tools outrank prose.** Storage sizing and arithmetic belong in calculators first, with RAG as supporting context.
 - **Access policy is retrieval logic.** Public, partner, and internal corpora cannot be separated only at the final answer stage.
 - **Graph is advisory.** Kuzu boosts and explains relationships; it does not make unsupported facts true.

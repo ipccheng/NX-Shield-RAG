@@ -13,6 +13,9 @@ The system is not a single retriever. It is a set of cooperating layers:
 5. **Evidence ledger** — expose what is known, weak, missing, or risky.
 6. **Answer guardrails** — force source-traceable claims and explicit uncertainty.
 7. **Profile-aware serving** — use MCP endpoints so different agents can share the RAG with different policies.
+8. **Operational control plane** — keep authority ranking, identity policy, rollout gates, corpus hygiene, and endpoint locality visible to operators.
+
+For the design strengths that go beyond generic agentic RAG, see [Enterprise RAG strengths](enterprise-rag-strengths.md).
 
 ## Component model
 

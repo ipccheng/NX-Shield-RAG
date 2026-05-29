@@ -36,6 +36,8 @@ sequenceDiagram
 
 ## Retrieval channels
 
+The pipeline is intentionally more operational than a generic agentic-RAG loop. It does not only decide where to search; it also applies source authority, access policy, weak-evidence disclosure, deterministic tool precedence, and graph hygiene assumptions before answer generation.
+
 ### 1. Vector search
 
 Best for semantic recall: paraphrases, conceptual questions, and product descriptions.
