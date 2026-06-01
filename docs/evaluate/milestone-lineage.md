@@ -6,11 +6,13 @@ NX-Shield RAG evolved through several design lessons. This page keeps the public
 
 ### Retrieval architecture improved, but answer quality needed its own layer
 
-Early work focused on search channels, routing, and reranking. Later work showed that good retrieval can still produce wrong answers unless the final synthesis is constrained by an Evidence Ledger.
+Early work focused on search channels, routing, and reranking. Later work showed that good retrieval can still produce wrong answers unless the final synthesis is constrained by an Evidence Ledger and checked by answer-verifier gates.
 
 ### Graph boost is useful but insufficient
 
 Kuzu graph context improved structural recall and explanation. It did not replace source evidence. The graph is now treated as advisory context.
+
+The safe rollout pattern is graph-shadow first: compare baseline evidence with graph-assisted candidates in reports before changing served ranking or answer generation.
 
 ### Unified corpus beats parallel legacy stores
 
@@ -20,10 +22,43 @@ A single active search path with explicit lineage metadata is easier to operate 
 
 Storage sizing and similar math questions should use deterministic calculators first. RAG provides definitions, assumptions, and caveats.
 
+A later evaluation milestone made this testable by injecting calculator output as report-only evidence for verifier scoring. This proves that math answers are tool-supported without mutating the corpus or graph.
+
+### Answer verification became a separate gate
+
+A dedicated verifier layer checks whether the drafted answer is supported by retrieved evidence and tool outputs. Its implementation-level verdicts are:
+
+- `PASS` — supported enough to answer normally,
+- `PASS_WITH_WARNINGS` — answerable, but with caveats or weak areas,
+- `REWRITE_REQUIRED` — useful retrieval exists, but the answer should be revised before delivery,
+- `FAIL_CLOSED` — policy, access, or evidence failure should block a normal answer.
+
+This separates "retrieval found something" from "the user-facing answer is safe to send."
+
+### Report-only eval harness became the change gate
+
+New retrieval, graph, calculator, and verifier behavior should pass a report-only eval harness before serving behavior changes.
+
+The harness pattern is:
+
+- frozen case corpus for regression checks,
+- local-corpus retrieval with external fallbacks disabled when isolating RAG quality,
+- sanitized evidence metadata by default,
+- expected source-family and exact-ID gates,
+- answer-verifier verdict expectations,
+- optional calculator evidence for sizing/math,
+- graph-shadow columns for future graph candidate fusion.
+
+This gives a safe promote path: report-only → shadow/warn → enforce, with human review between phases.
+
+### Competitive answers require source-balance checks
+
+For comparison questions, especially competitive AI or platform comparisons, one-sided evidence should not be treated as a complete answer. The eval harness should require evidence for both sides where possible and disclose weak or missing competitor evidence.
+
 ### Profile endpoints require direct verification
 
 A profile can discover a tool while its backing service still points to an old script/config. Direct MCP canaries per endpoint are mandatory.
 
 ### Public docs should avoid dynamic operational facts
 
-Live row counts, private hostnames, internal paths, and temporary benchmark numbers go stale quickly and can leak context. Public docs should focus on stable design.
+Live row counts, private hostnames, internal paths, temporary benchmark numbers, and raw eval outputs go stale quickly and can leak context. Public docs should focus on stable design.

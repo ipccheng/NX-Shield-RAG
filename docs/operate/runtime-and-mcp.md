@@ -42,7 +42,8 @@ The current deployed shape behind this design is:
 - the same service-side tool concept, `hermes_master_search`, exposed through each profile,
 - retrieval-time stale-KB policy rather than destructive deletion,
 - deterministic routing for exact KB, limit/fact, and explicit comparison queries,
-- optional graph/backfill context kept separate from the LanceDB schema contract.
+- optional graph/backfill context kept separate from the LanceDB schema contract,
+- answer-verifier shadow checks before any delivery enforcement.
 
 Public docs intentionally omit local ports, hostnames, LaunchAgent labels, and private filesystem paths. Those belong in the private source-recovery repo and operational backups.
 
@@ -54,7 +55,25 @@ A healthy runtime is not proven by "the process is running." Verify:
 - a direct MCP canary returns evidence ledger output,
 - profile-level agent calls use RAG before answering domain questions,
 - calculator-first sizing queries call calculator path,
-- access-policy canaries do not retrieve disallowed source families.
+- access-policy canaries do not retrieve disallowed source families,
+- answer-verifier shadow reports are generated without changing delivery,
+- graph-shadow evaluation is report-only until promoted.
+
+## Answer-verifier rollout
+
+Answer verification should be enabled in phases:
+
+1. **Report-only CLI** — run verifier against saved or generated evidence packets.
+2. **Shadow runtime** — run verifier during live agent turns but do not change the delivered response.
+3. **Warn/rewrite** — allow `REWRITE_REQUIRED` verdicts to trigger one safe regeneration or a visible caution.
+4. **Enforce** — fail closed only after the shadow and warn phases show acceptable false-positive and latency behavior.
+
+The verifier should check:
+
+- whether the answer is supported by retrieved evidence,
+- whether restricted evidence leaked into a lower-trust profile,
+- whether deterministic calculator output was used for math/sizing,
+- whether weak competitive evidence is disclosed rather than hidden.
 
 ## Private source mapping
 

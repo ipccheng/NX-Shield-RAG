@@ -49,12 +49,51 @@ answer_rules:
 
 ## Verdicts
 
-Use verdicts to decide answer posture:
+Use verdicts to decide answer posture. There are two useful layers:
+
+Conceptual posture:
 
 - **strong** — enough direct, authoritative evidence to answer normally.
 - **review** — useful evidence exists, but production impact or partial evidence requires caution.
 - **weak** — evidence is thin or one-sided; answer should focus on what is known and what to verify.
 - **blocked** — policy/access/source constraints prevent answering.
+
+Implementation-level verifier verdicts:
+
+- `PASS` — supported enough to answer normally.
+- `PASS_WITH_WARNINGS` — answerable, but caveats or weak areas must be visible.
+- `REWRITE_REQUIRED` — retrieved evidence is not enough for the current draft; revise before delivery.
+- `FAIL_CLOSED` — do not send a normal answer because evidence, access policy, or safety gates failed.
+
+A practical mapping is:
+
+```text
+strong  -> PASS
+review  -> PASS_WITH_WARNINGS or REWRITE_REQUIRED
+weak    -> REWRITE_REQUIRED
+blocked -> FAIL_CLOSED
+```
+
+The mapping is intentionally conservative. A user-facing answer should pass evidence support, source authority, and access-policy checks before it is delivered as a confident response.
+
+## Calculator/tool evidence
+
+For sizing and math-heavy questions, deterministic tools should create the numeric evidence. The Evidence Ledger should then explain assumptions, limits, and source-backed caveats.
+
+A safe pattern is:
+
+```yaml
+supported_claims:
+  - source: storage calculator
+    claim: Required usable capacity target maps to a specific sizing result under stated RF, resiliency, CPU, RAM, and per-node raw capacity assumptions.
+
+answer_rules:
+  - cite calculator assumptions before giving numeric recommendations
+  - do not invent capacity numbers from prose-only retrieval
+  - ask for missing workload assumptions when the calculator input is underspecified
+```
+
+Calculator output can be attached as evidence in report-only evaluation before it is wired into live serving.
 
 ## Why this works
 
@@ -64,14 +103,15 @@ The ledger creates a boundary between retrieval and writing. It makes the model 
 - What obligation is still missing?
 - Should this be a confident answer or a review-mode answer?
 - Are we using deterministic tools where needed?
+- Did the verifier accept the answer or require a rewrite?
 
 ## Implementation notes
 
-In the private source bundle, this pattern maps mainly to the active RAG search script and answer-formatting path:
+In the private source bundle, this pattern maps mainly to the active RAG search, verifier, and answer-formatting paths:
 
 ```text
 ipccheng/NX-Shield-RAG-src
-└── rag/hermes-nutanix/scripts/openclaw/nutanix_rag_search.py
+└── rag/hermes-nutanix/
 ```
 
 The exact implementation can change, but the public design contract should remain stable: **the final answer must be traceable to evidence and rules.**
