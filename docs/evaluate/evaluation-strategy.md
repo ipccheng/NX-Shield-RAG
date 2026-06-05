@@ -91,9 +91,33 @@ Keep a small suite of human-meaningful canaries:
 - intentionally weak evidence query,
 - disallowed internal-source query,
 - partner/public access-boundary query,
-- graph-shadow query where graph context should help but not become truth.
+- graph-shadow query where graph context should help but not become truth,
+- architecture-supportability query where separately true facts must not be composed into an unsupported design.
 
 The private source repo can keep concrete corpus files, local run IDs, and raw evidence. Public docs should describe the case classes and evaluation gates.
+
+## Architecture-supportability checks
+
+Architecture questions need more than ordinary semantic top-k evidence. The evaluation set should include composed-design cases where a plausible answer could incorrectly combine individually true statements into an unsupported architecture.
+
+Useful architecture-supportability lanes include:
+
+- **unsupported composition lane** — reject designs that stretch a management-plane quorum, appliance, or HA group across failure domains unless official evidence supports that exact composed design;
+- **global-management lane** — require direct evidence for global or fleet-level management, rather than inferring it from a local management-plane HA guide;
+- **failure-domain lane** — distinguish site/failure-domain survivability from node or VM-level HA inside one supported domain;
+- **fallback lane** — allow backup/restore or DR runbooks as weaker recovery evidence, but do not treat them as equivalent to an active-active or stretched-quorum architecture.
+
+For example, a customer can reasonably ask for one management experience across two sites plus a witness, but the answer must not infer that a three-VM management plane can be placed one VM per site/witness just because scale-out HA, anti-affinity, Metro/witness, and backup/restore are each documented elsewhere.
+
+Expected behavior for this class:
+
+```text
+direct official evidence for the composed architecture -> answer may recommend it
+partial adjacent evidence only -> answer must caveat or propose safer alternatives
+contradicting or constraining evidence -> answer must rewrite or fail closed
+```
+
+These checks should stay in the eval/verifier framework so improvements generalize beyond one named customer design or one product acronym.
 
 ## Calculator/tool evidence checks
 
