@@ -68,6 +68,16 @@ retrieval evidence is present + expected source gates pass + verifier verdict is
 
 Expected verifier verdicts should usually be `PASS` or `PASS_WITH_WARNINGS`. Cases expected to require caution, such as restricted-source questions, one-sided competitive evidence, or missing exact KB evidence, should be explicitly marked as expected review/rewrite cases so unexpected regressions stand out.
 
+## Verifier enforcement progression
+
+A safe verifier rollout separates three states:
+
+1. **shadow/report-only** — write a verifier report and delivery decision, but leave the answer unchanged;
+2. **fallback-only enforcement** — if the answer cannot be verified, send a conservative evidence-bound fallback instead of the draft;
+3. **regenerate-once enforcement** — for `REWRITE_REQUIRED`, run exactly one bounded revision using only retrieved evidence and verifier feedback, reverify the revised answer, then send the revised answer only if it passes; otherwise fail closed to the evidence fallback.
+
+Regeneration should be explicitly config-gated, audited with both draft and revised verifier reports, and protected from retry loops or unbounded second model calls.
+
 ## Regression suite design
 
 Keep a small suite of human-meaningful canaries:
@@ -112,7 +122,7 @@ A graph-shadow report should compare:
 - latency impact,
 - whether exact-ID and source-authority gates still pass.
 
-Graph improvements should be promoted only if they improve recall or explanation without weakening source authority, access policy, exact-ID behavior, or latency budgets.
+Graph improvements should be promoted only if they improve recall or explanation without weakening source authority, access policy, exact-ID behavior, or latency budgets. A passing aggregate graph-shadow gate is not sufficient by itself: every top-1 change should be classified as beneficial, neutral, risky, or bad, and no-entity cases should be treated as query/entity coverage review rather than automatic graph-store mutation.
 
 ## Milestone reports
 
