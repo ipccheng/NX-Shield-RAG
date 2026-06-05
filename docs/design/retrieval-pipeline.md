@@ -93,6 +93,23 @@ A useful pipeline should not just concatenate results. NX-Shield uses these idea
 - **Comparison-collateral routing** for explicit comparison questions, so competitive/battlecard evidence can appear alongside official product evidence instead of being buried by Portal-only boosts.
 - **Weak-evidence detection** so one-sided or low-authority evidence triggers caution.
 
+## Architecture/supportability queries
+
+Supportability questions require more than nearby evidence. The system should avoid composing a design from separately true facts unless the retrieved sources support the composed architecture directly.
+
+For multi-site, witness, HA/DR, or management-plane questions, retrieval should intentionally gather multiple evidence lanes, such as:
+
+- management-plane topology and scale-out limits,
+- global or multi-instance management options,
+- witness/DR requirements and boundaries,
+- explicit unsupported-composition or caveat evidence.
+
+The Evidence Ledger and answer verifier should then distinguish:
+
+- directly supported architecture,
+- supported components that do not prove the composed architecture,
+- unsupported or not-found claims that must be stated cautiously.
+
 ## Output contract
 
 The retrieval layer should return a packet like this:

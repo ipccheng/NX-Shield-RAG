@@ -51,12 +51,14 @@ Public docs intentionally omit local ports, hostnames, LaunchAgent labels, and p
 
 A healthy runtime is not proven by "the process is running." Verify:
 
-- MCP discovery lists the expected tool,
+- MCP discovery lists the expected service-side tool,
+- the gateway-registered MCP tool name is recognized by evidence extraction,
 - a direct MCP canary returns evidence ledger output,
 - profile-level agent calls use RAG before answering domain questions,
 - calculator-first sizing queries call calculator path,
 - access-policy canaries do not retrieve disallowed source families,
-- answer-verifier shadow reports are generated without changing delivery,
+- answer-verifier shadow reports are generated for the same live turn,
+- verifier delivery decisions are logged before sending the final response,
 - graph-shadow evaluation is report-only until promoted.
 
 ## Answer-verifier rollout
@@ -89,3 +91,5 @@ ipccheng/NX-Shield-RAG-src
 ## Operational rule
 
 Restarting a gateway is not the same as restarting a RAG MCP service. When code/config changes cross service boundaries, verify the exact process that imports the changed module.
+
+For profile-scoped gateways, verify that shared verifier modules are resolved from an explicit RAG source root or equivalent package path. Otherwise a gateway can retrieve evidence successfully but silently skip verification because the verifier import path is wrong.

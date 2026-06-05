@@ -35,6 +35,13 @@ A dedicated verifier layer checks whether the drafted answer is supported by ret
 
 This separates "retrieval found something" from "the user-facing answer is safe to send."
 
+The delivery hook also needs its own runtime proof. A good answer and a passing retrieval trace are not enough to prove enforcement. The gateway should emit an auditable verifier report and delivery decision for the same user turn before the system is considered live-enforcement ready.
+
+Two implementation lessons matter for MCP-based agent gateways:
+
+- verify both the service-side tool name and the gateway-registered MCP tool name, because clients may prefix tool names when registering MCP servers;
+- test the actual gateway message shape, not only ideal assistant/tool fixtures, because tool-call metadata may be serialized or exposed through different fields at runtime.
+
 ### Report-only eval harness became the change gate
 
 New retrieval, graph, calculator, and verifier behavior should pass a report-only eval harness before serving behavior changes.
@@ -58,6 +65,12 @@ For comparison questions, especially competitive AI or platform comparisons, one
 ### Profile endpoints require direct verification
 
 A profile can discover a tool while its backing service still points to an old script/config. Direct MCP canaries per endpoint are mandatory.
+
+Profile-scoped gateways also need explicit environment/path checks for verifier imports. If a gateway resolves its home directory to a profile-specific root, shared RAG verifier modules should be located through a configured RAG root rather than by assuming the profile directory contains the RAG source tree.
+
+### Architecture questions require composed-design evidence
+
+For architecture/supportability questions, do not compose a supported design from separately true facts. For example, support for a scale-out management plane, a witness pattern, and multi-site operations are separate facts; the final architecture is supportable only if direct evidence supports that composed design. Retrieval should use multiple evidence lanes and the verifier should reject unsupported composition.
 
 ### Public docs should avoid dynamic operational facts
 

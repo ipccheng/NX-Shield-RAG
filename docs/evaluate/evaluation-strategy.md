@@ -56,13 +56,14 @@ A useful report-only harness should:
 - record sanitized evidence metadata rather than raw private chunks by default,
 - compare retrieved evidence against expected source families and exact identifiers,
 - run answer-verifier checks without changing delivery behavior,
+- prove runtime verifier hooks by checking for a same-turn shadow report and delivery decision,
 - support deterministic calculator/tool evidence as in-memory evidence for math or sizing cases,
 - emit shadow columns for experimental graph or reranking paths before changing production ranking.
 
 The default pass condition is not simply "got an answer." It is:
 
 ```text
-retrieval evidence is present + expected source gates pass + verifier verdict is acceptable
+retrieval evidence is present + expected source gates pass + verifier verdict is acceptable + runtime delivery decision is auditable
 ```
 
 Expected verifier verdicts should usually be `PASS` or `PASS_WITH_WARNINGS`. Cases expected to require caution, such as restricted-source questions, one-sided competitive evidence, or missing exact KB evidence, should be explicitly marked as expected review/rewrite cases so unexpected regressions stand out.
