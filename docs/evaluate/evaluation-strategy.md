@@ -148,6 +148,26 @@ A graph-shadow report should compare:
 
 Graph improvements should be promoted only if they improve recall or explanation without weakening source authority, access policy, exact-ID behavior, or latency budgets. A passing aggregate graph-shadow gate is not sufficient by itself: every top-1 change should be classified as beneficial, neutral, risky, or bad, and no-entity cases should be treated as query/entity coverage review rather than automatic graph-store mutation.
 
+## Verifier utility guardrails
+
+Verifier enforcement should optimize for safety first, then utility. For architecture-supportability cases, the safety-critical gate is that unsupported composed designs are rejected or fail closed. A separate utility gate should measure whether safe negated or cautionary wording is incorrectly treated as an unsupported positive claim.
+
+Useful verdict posture:
+
+```text
+unsafe positive composition -> FAIL_CLOSED or evidence fallback
+safe caution / "do not present as supported" -> PASS_WITH_WARNINGS or supported rewrite
+insufficient direct evidence -> conservative fallback with weak-evidence disclosure
+```
+
+This prevents a false sense of readiness: a verifier can be safe enough for guarded serving while still needing utility refinements to reduce unnecessary fallbacks.
+
+## Guarded graph/live checks
+
+Graph ranking can move through a guarded-live state only when source review shows neutral or beneficial top-1 changes. Neutral reorderings should stay inside authoritative source families, preserve exact-ID hits, and avoid moving from official sources to community or third-party sources.
+
+Promotion should remain reversible through config, not data mutation. If the graph layer is disabled, the vector/lexical/exact retrieval path should still produce evidence-bound answers.
+
 ## Milestone reports
 
 The private source repo stores historical K-series, canary, and eval-harness reports. Public docs should summarize patterns, not expose local-only operational data.

@@ -43,9 +43,27 @@ The current deployed shape behind this design is:
 - retrieval-time stale-KB policy rather than destructive deletion,
 - deterministic routing for exact KB, limit/fact, and explicit comparison queries,
 - optional graph/backfill context kept separate from the LanceDB schema contract,
+- service-safe graph probe mode for graph backend canaries,
+- graph ranking promoted only through shadow, guarded-canary, and rollback-gated live steps,
 - answer-verifier shadow checks before any delivery enforcement.
 
 Public docs intentionally omit local ports, hostnames, LaunchAgent labels, and private filesystem paths. Those belong in the private source-recovery repo and operational backups.
+
+## Store parity and sync checks
+
+For multi-host RAG serving, "the code is deployed" is not enough. Treat vector store, graph store, source documents, service config, and profile policy as separate parity layers.
+
+A safe store-sync workflow should:
+
+1. compare logical row counts, schema hashes, and stable document/chunk digests before replacement,
+2. back up the destination stores before copying,
+3. stop only the services that hold the destination stores open,
+4. copy directory-backed vector stores and file-backed graph stores with the correct filesystem semantics,
+5. clear only stale graph sidecars after backup,
+6. reopen/checkpoint the copied graph store before service restart,
+7. verify fresh MCP clients for every serving profile.
+
+Physical database file hashes can differ after a checkpoint or reopen even when the logical graph is identical. Prefer logical parity checks — node/edge counts, stable chunk identifiers, schema/table shape, and sidecar absence — over raw file hashes alone.
 
 ## Runtime checks
 

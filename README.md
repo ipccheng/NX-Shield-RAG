@@ -17,8 +17,10 @@ This repo documents how NX-Shield RAG is designed to answer questions with:
 - **source authority and access policy** instead of a flat document pile,
 - **calculator/tool-first paths** when deterministic math beats language-model guessing,
 - **graph context** as structural signal, not as a replacement for evidence,
+- **service-safe graph backend rollout** so graph migrations can be canaried without destabilizing serving,
 - **weak-evidence disclosure** instead of confident answers from partial coverage,
 - **MCP service boundaries** so multiple agents can share the same RAG safely,
+- **store-parity operations** so multi-host serving is verified by logical digests and fresh canaries,
 - **rebuild discipline** so the system can be recreated from private source and public docs.
 
 ## Sample query path
@@ -208,6 +210,7 @@ flowchart TB
 - **Deterministic tools outrank prose.** Storage sizing and arithmetic belong in calculators first, with RAG as supporting context.
 - **Access policy is retrieval logic.** Public, partner, and internal corpora cannot be separated only at the final answer stage.
 - **Graph is advisory.** Kuzu boosts and explains relationships; it does not make unsupported facts true.
+- **Graph rollout is gated.** Shadow, canary, guarded-live, and rollback states are safer than an all-at-once graph cutover.
 - **Rebuildability matters.** Every major runtime concept should map to a private script/config path and an external data backup requirement.
 
 ## Status

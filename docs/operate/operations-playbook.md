@@ -42,6 +42,22 @@ Symptom: vector search is filtered correctly, but local grep/chat/web fallback l
 
 Fix: apply access policy to every retrieval/fallback path, not only LanceDB.
 
+### Store drift between hosts
+
+Symptom: one profile retrieves newer documents or graph context while another does not.
+
+Likely cause: vector store, graph store, or source artifacts were updated on one host but not synced to the other.
+
+Fix: run a report-first parity check using stable row counts, schema hashes, chunk/document digests, graph node/edge counts, and fresh MCP canaries. Sync only after a destination backup and restart only the scoped RAG services that hold the stores open.
+
+### Graph backend migration risk
+
+Symptom: graph retrieval works in a foreground test but causes service instability or native-module conflicts in the long-running runtime.
+
+Likely cause: graph drivers and other native libraries are loaded in the same process, or the candidate graph backend was promoted before deterministic ordering and rollback gates were proven.
+
+Fix: isolate the graph backend behind a service-safe probe or adapter, keep ranking in shadow/canary first, require source review for top-1 changes, and preserve a graph-disabled rollback mode.
+
 ## Canary categories
 
 - exact identifier query,

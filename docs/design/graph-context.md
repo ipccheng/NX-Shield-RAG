@@ -54,6 +54,31 @@ A graph-shadow report should answer:
 - Did it violate profile access boundaries?
 - Did it add unacceptable latency?
 
+## Service-safe graph backend pattern
+
+Graph libraries and vector-store runtimes do not always coexist safely inside one long-running Python process. A production graph layer should therefore support a service-safe probe or adapter mode:
+
+- keep the graph database as a read-only retrieval signal during rollout,
+- isolate driver-specific imports if mixed native modules can conflict,
+- make graph candidate ordering deterministic before comparing top-k results,
+- preserve a rollback path to the previous graph backend or to graph-disabled retrieval,
+- verify that no write-ahead, shadow, or lock sidecars appear during read-only serving canaries.
+
+This pattern lets a team evaluate a new graph backend without treating the migration as a data-store cutover. The backend can be active as a candidate source while ranking remains canary or guarded-live.
+
+## Guarded live promotion
+
+Moving graph context from shadow to serving should require more than a passing aggregate score. A safer promotion gate checks:
+
+- every top-1 change is source-reviewed,
+- no exact identifier hit is demoted,
+- no source-authority downgrade occurs,
+- top-5 overlap remains high for neutral reorderings,
+- answer verification still rejects unsupported architecture composition,
+- rollback can disable graph ranking without changing the corpus.
+
+A useful intermediate state is **guarded live**: graph ranking can influence retrieval with bounded boosts, exact-ID protection, query-anchor requirements, and verifier fallback still active. This treats graph as an operationally useful signal while keeping the Evidence Ledger and verifier as the final safety gates.
+
 ## Safety rule
 
 Graph proximity can justify retrieving more evidence. It cannot justify an answer by itself.
