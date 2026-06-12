@@ -29,7 +29,7 @@ Example user question:
 
 > Can you provide a detailed comparison of VMware Cloud Foundation (VCF) 9.1 and Nutanix AOS 7.5?
 
-![NX-Shield RAG sample query path for VCF 9.1 vs AOS 7.5](diagrams/sample-query-path-vcf-aos.png)
+![NX-Shield RAG current query path with Ladybug primary graph DB and Kuzu legacy archive](diagrams/sample-query-path-vcf-aos.png)
 
 This is a comparison query, so the RAG path is deliberately different from a single factual lookup. The goal is not only to retrieve chunks, but to produce balanced evidence for both products and make weak coverage visible before answer generation.
 
@@ -63,7 +63,7 @@ The implementation keeps the fan-out bounded for latency:
 
 ### 3. Add graph context, but do not let graph become truth
 
-In parallel with query planning, Kuzu is queried once for entity and relationship hints. For this sample, graph context might surface relationships among AOS, AHV, Prism, VCF, ESXi/vSphere, lifecycle tools, and storage concepts.
+In parallel with query planning, the active graph layer is queried for entity and relationship hints. The current design uses Ladybug as the primary graph DB, with Kuzu retained only as a legacy read-only archive during retirement. For this sample, graph context might surface relationships among AOS, AHV, Prism, VCF, ESXi/vSphere, lifecycle tools, and storage concepts.
 
 Graph matches can boost or annotate retrieved chunks, but they do not create answer claims by themselves. A graph edge is treated as structural signal; the final answer still needs source-backed evidence.
 
@@ -136,7 +136,7 @@ Accuracy controls:
 - alias expansion for acronyms and product names,
 - hybrid vector + full-text retrieval,
 - scalar access/source filters,
-- Kuzu graph hints as bounded boosts only,
+- Ladybug graph hints as bounded boosts only, with Kuzu retained only as a legacy archive during retirement,
 - RRF fusion across independent channels,
 - cross-encoder reranking,
 - source-authority and metadata multipliers with caps,
@@ -161,7 +161,7 @@ flowchart TB
   C --> Q[Query variants + obligations]
   Q --> L[LanceDB hybrid search<br/>vector + FTS + scalar filters]
   Q --> X[Exact / deterministic lookup]
-  Q --> K[Kuzu graph context<br/>entity and relationship hints]
+  Q --> K[Ladybug graph context<br/>entity and relationship hints]
   Q --> S[Calculator-first tools<br/>for sizing/math questions]
   L --> F[RRF + dedup + source diversity]
   X --> F
@@ -209,7 +209,7 @@ flowchart TB
 - **Production controls are part of RAG.** Authority ranking, identity filters, rollout gates, endpoint locality checks, and corpus hygiene are not optional extras; they are what make retrieval safe to operate.
 - **Deterministic tools outrank prose.** Storage sizing and arithmetic belong in calculators first, with RAG as supporting context.
 - **Access policy is retrieval logic.** Public, partner, and internal corpora cannot be separated only at the final answer stage.
-- **Graph is advisory.** Kuzu boosts and explains relationships; it does not make unsupported facts true.
+- **Graph is advisory.** Ladybug graph signals explain relationships and can provide bounded boosts; they do not make unsupported facts true. Kuzu is treated as a legacy read-only/archive path during retirement.
 - **Graph rollout is gated.** Shadow, canary, guarded-live, and rollback states are safer than an all-at-once graph cutover.
 - **Rebuildability matters.** Every major runtime concept should map to a private script/config path and an external data backup requirement.
 
