@@ -38,11 +38,13 @@ sequenceDiagram
 
 The pipeline is intentionally more operational than a generic agentic-RAG loop. It does not only decide where to search; it also applies source authority, access policy, weak-evidence disclosure, deterministic tool precedence, and graph hygiene assumptions before answer generation.
 
+Gateway or agent wrappers may add conversation context around a user question. The retrieval layer should focus the current user question first, then use previous-turn context only as secondary signal. This avoids cases where phrases from a prior weak answer, fallback, or diagnostic wrapper pollute the search query and suppress the source that would have answered the live question.
+
 ### 1. Vector search
 
 Best for semantic recall: paraphrases, conceptual questions, and product descriptions.
 
-Failure mode: can retrieve plausible-but-wrong chunks when terminology overlaps.
+Failure mode: can retrieve plausible-but-wrong chunks when terminology overlaps. The embedding call itself is also an operational dependency: provider responses should be shape-validated before indexing into `data[0].embedding`, retried only within a bounded window, and failed closed with a redacted actionable error when the response is an error object or malformed payload.
 
 ### 2. Full-text search
 

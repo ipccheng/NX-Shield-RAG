@@ -56,7 +56,23 @@ Symptom: graph retrieval works in a foreground test but causes service instabili
 
 Likely cause: graph drivers and other native libraries are loaded in the same process, or the candidate graph backend was promoted before deterministic ordering and rollback gates were proven.
 
-Fix: isolate the graph backend behind a service-safe probe or adapter, keep ranking in shadow/canary first, require source review for top-1 changes, and preserve a graph-disabled rollback mode.
+Fix: isolate the graph backend behind a service-safe probe or adapter, keep ranking in shadow/canary first, require source review for top-1 changes, and preserve a graph-disabled rollback mode. When a replacement graph backend is active, freeze writes to the retired backend before deleting it; keep the old graph as a read-only rollback/archive until parity, dependency, and rollback checks pass.
+
+### Embedding provider malformed response
+
+Symptom: many unrelated retrieval cases fail at the vector-search stage with a missing-field, empty-vector, or provider-error response instead of ordinary no-results behavior.
+
+Likely cause: the embedding endpoint returned an error object or malformed payload, or credentials/provider state changed. This is not a signal to re-ingest documents, rebuild graph edges, or prune corpus rows.
+
+Fix: validate response shape before reading embedding fields, redact provider error details in logs, retry only within a bounded window, fail closed with an actionable error, and rerun the report-only harness after the dependency is healthy.
+
+### Context-wrapped query pollution
+
+Symptom: a direct clean query retrieves good evidence, but the live gateway/tool path retrieves weak or no evidence for the same user intent.
+
+Likely cause: the gateway wrapped the live question with previous answer context, diagnostic prose, or tool instructions, and the retrieval router treated the wrapper text as equally important.
+
+Fix: extract and route the current question first. Use previous-turn context only as a secondary signal, and add canaries for both clean and wrapped query shapes.
 
 ## Canary categories
 

@@ -148,6 +148,10 @@ A graph-shadow report should compare:
 
 Graph improvements should be promoted only if they improve recall or explanation without weakening source authority, access policy, exact-ID behavior, or latency budgets. A passing aggregate graph-shadow gate is not sufficient by itself: every top-1 change should be classified as beneficial, neutral, risky, or bad, and no-entity cases should be treated as query/entity coverage review rather than automatic graph-store mutation.
 
+A clean shadow run should also prove that the embedding/vector dependency is healthy. If all or most retrieval cases fail because the embedding provider returns an error object, missing field, empty vector, or otherwise malformed payload, the result is an embedding reliability incident, not evidence that the corpus or graph is bad. Fix and retest that dependency before drawing graph-promotion conclusions.
+
+Production promotion should be based on a sufficiently broad case set, not only a small smoke test. A smoke test can clear an outage, but live graph-neighbor ranking still needs a larger gate with zero retrieval failures, acceptable hit rate, bounded latency, verifier expectations met, and a documented rollback mode.
+
 ## Verifier utility guardrails
 
 Verifier enforcement should optimize for safety first, then utility. For architecture-supportability cases, the safety-critical gate is that unsupported composed designs are rejected or fail closed. A separate utility gate should measure whether safe negated or cautionary wording is incorrectly treated as an unsupported positive claim.
