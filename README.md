@@ -185,6 +185,7 @@ flowchart TB
 8. [Rebuild from private source](docs/build/rebuild-from-private-source.md) — how to reconstruct the runtime from docs + private repo.
 9. [Operations model](docs/operate/runtime-and-mcp.md) — profile-aware MCP serving and runtime boundaries.
 10. [Evaluation strategy](docs/evaluate/evaluation-strategy.md) — canaries and regression classes.
+11. [RAG improvements release note](docs/evaluate/rag-improvements-release-note.md) — current public summary of retrieval, graph, verifier, and operations improvements.
 
 ## Repository map
 
