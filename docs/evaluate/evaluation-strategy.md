@@ -152,6 +152,33 @@ A clean shadow run should also prove that the embedding/vector dependency is hea
 
 Production promotion should be based on a sufficiently broad case set, not only a small smoke test. A smoke test can clear an outage, but live graph-neighbor ranking still needs a larger gate with zero retrieval failures, acceptable hit rate, bounded latency, verifier expectations met, and a documented rollback mode.
 
+## Verifier evidence-scope guardrails
+
+Verifier enforcement should verify the answer against evidence from the same user turn, not against the whole accumulated conversation. A follow-up such as “is this calculation hardcoded?” or an operational RCA about gateway/verifier behavior must not be checked against storage-calculator or RAG rows from a previous sizing answer.
+
+Useful guardrails:
+
+- bind evidence extraction to tool results produced after the current user message;
+- treat deterministic calculator/tool outputs as evidence only for the current sizing/math turn;
+- keep internal revision prompts out of user-input evidence augmentation;
+- skip domain evidence enforcement for operational or meta-debug answers that are grounded in runtime logs, code, or session state rather than product documentation;
+- preserve strict enforcement for customer-facing product, supportability, licensing, architecture, and sizing claims.
+
+A good regression suite should include multi-turn fixtures: a valid sizing answer with calculator evidence, followed by a meta question that should produce no domain verifier fallback. This catches stale-evidence leakage and verifier prompt loops before they reach a messaging gateway.
+
+## Scheduled verifier-path canaries
+
+Report-only canaries should exercise the actual runtime path, not only idealized unit fixtures. A practical canary set checks:
+
+- same-turn shadow report creation for normal RAG answers;
+- no verifier report for meta/debug follow-ups without current-turn domain evidence;
+- storage-calculator evidence extraction for sizing/BOM turns;
+- gateway process freshness after code changes;
+- MCP tool discovery for each profile or serving identity;
+- profile-specific import-root and identity configuration.
+
+The canary should be silent on success and alert only on failure. Passing canaries do not approve data-store mutation, graph promotion, or new enforcement tiers; they only prove that the verifier/evidence path has not regressed.
+
 ## Verifier utility guardrails
 
 Verifier enforcement should optimize for safety first, then utility. For architecture-supportability cases, the safety-critical gate is that unsupported composed designs are rejected or fail closed. A separate utility gate should measure whether safe negated or cautionary wording is incorrectly treated as an unsupported positive claim.
