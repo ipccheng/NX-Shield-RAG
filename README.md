@@ -152,27 +152,6 @@ Latency controls:
 - context expansion only for fused top candidates,
 - fallback waterfall so Slack/Web are skipped when local evidence is strong.
 
-## The design in one diagram
-
-```mermaid
-flowchart TB
-  U[User question] --> G[Agent / MCP client]
-  G --> C[Query classifier]
-  C --> Q[Query variants + obligations]
-  Q --> L[LanceDB hybrid search<br/>vector + FTS + scalar filters]
-  Q --> X[Exact / deterministic lookup]
-  Q --> K[Ladybug graph context<br/>entity and relationship hints]
-  Q --> S[Calculator-first tools<br/>for sizing/math questions]
-  L --> F[RRF + dedup + source diversity]
-  X --> F
-  K --> F
-  S --> F
-  F --> R[Rerank + bounded boosts]
-  R --> E[Evidence Ledger]
-  E --> A[Answer obligations + guardrails]
-  A --> O[Grounded answer or explicit uncertainty]
-```
-
 ## Start here
 
 1. [Architecture overview](docs/design/architecture.md) — the full design at human scale.
