@@ -12,7 +12,7 @@ vector search demo
 → identity-aware, verifier-controlled, graph-assisted RAG platform
 ```
 
-The design goal is not just to retrieve relevant snippets. The goal is to produce answers that are source-grounded, access-policy aware, measurable, and safe to operate across multiple agent profiles.
+The design goal is not just to retrieve relevant snippets. The goal is to produce answers that are source-grounded, access-policy aware, measurable, and governable across multiple agent profiles. A live deployment still needs approval for the application boundary, model/provider path, data classes, and use case before it is treated as production-ready or external-facing.
 
 ## What improved
 
@@ -181,4 +181,4 @@ local-first hybrid retrieval
 + evaluation-gated operations
 ```
 
-That combination is what makes the system suitable for technical support, presales, and partner-facing use cases where unsupported claims are operationally risky.
+That combination makes the system a stronger candidate architecture for technical support, presales, and partner-facing use cases where unsupported claims are operationally risky. It does not, by itself, make any specific deployment approved for those use cases; approval depends on the organization’s AI governance process, data classification, provider path, and operating controls.

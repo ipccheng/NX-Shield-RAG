@@ -6,6 +6,7 @@ NX-Shield RAG is organized around one operational goal:
 
 The system is not a single retriever. It is a set of cooperating layers:
 
+0. **Governance envelope** — define the approved application boundary, accountable owner, model/provider path, data classes, human oversight model, and monitoring obligations before treating a deployment as production-ready.
 1. **Question understanding** — classify risk, intent, product family, and answer obligations.
 2. **Retrieval planning** — generate variants and choose retrieval channels.
 3. **Hybrid evidence gathering** — combine LanceDB vector/FTS/scalar filters, exact lookup, graph context, and deterministic tools.
@@ -112,5 +113,6 @@ The ledger is the handoff between retrieval and answer generation. It should mak
 - **Private source scripts** live in `ipccheng/NX-Shield-RAG-src`.
 - **Large RAG data stores** live in backups, not Git.
 - **Secrets** live only in a credential vault or local env files.
+- **Governance records** such as approvals, risk assessments, data-class decisions, and provider reviews live in internal systems, not in this public repo.
 
-This separation is part of the architecture. A public repo should teach the design without becoming an accidental data leak.
+This separation is part of the architecture. A public repo should teach the design without becoming an accidental data leak or a substitute for formal approval.

@@ -2,9 +2,11 @@
 
 **A field-tested design for building a trustworthy enterprise RAG system — not just a vector search demo.**
 
-NX-Shield RAG is a public design notebook for a Nutanix-focused retrieval-augmented generation system. The implementation is private, but the architecture is documented here so other teams can copy the patterns: hybrid retrieval, source authority, graph context, calculator-first tooling, evidence-ledger answer synthesis, and profile-aware MCP serving.
+NX-Shield RAG is a public design notebook for a Nutanix-focused retrieval-augmented generation system. The implementation is private, but the architecture is documented here so other teams can copy the patterns: hybrid retrieval, source authority, graph context, calculator-first tooling, evidence-ledger answer synthesis, profile-aware MCP serving, and governance-aware operating controls.
 
-> If you only remember one idea: **retrieval is not the product; evidence-bound answers are the product.**
+> If you only remember one idea: **retrieval is not the product; evidence-bound, policy-aware answers are the product.**
+>
+> Governance note: this repo describes a design pattern. A live deployment still needs the appropriate review and approval for its application, model/provider path, data classes, user population, and use case.
 
 ## Why this repo exists
 
@@ -18,6 +20,7 @@ This repo documents how NX-Shield RAG is designed to answer questions with:
 - **calculator/tool-first paths** when deterministic math beats language-model guessing,
 - **graph context** as structural signal, not as a replacement for evidence,
 - **service-safe graph backend rollout** so graph migrations can be canaried without destabilizing serving,
+- **governance-aware approval boundaries** so RAG controls do not get mistaken for formal approval,
 - **weak-evidence disclosure** instead of confident answers from partial coverage,
 - **MCP service boundaries** so multiple agents can share the same RAG safely,
 - **store-parity operations** so multi-host serving is verified by logical digests and fresh canaries,
@@ -161,10 +164,11 @@ Latency controls:
 5. [Metadata and corpus design](docs/design/metadata-and-corpus.md) — source authority, access policy, and lineage.
 6. [LanceDB schema](docs/design/lancedb-schema.md) — the public-safe shape of the active unified v4 corpus.
 7. [Ingestion and corpus design](docs/build/ingestion-and-corpus.md) — how content should enter the system.
-8. [Rebuild from private source](docs/build/rebuild-from-private-source.md) — how to reconstruct the runtime from docs + private repo.
-9. [Operations model](docs/operate/runtime-and-mcp.md) — profile-aware MCP serving and runtime boundaries.
-10. [Evaluation strategy](docs/evaluate/evaluation-strategy.md) — canaries and regression classes.
-11. [RAG improvements release note](docs/evaluate/rag-improvements-release-note.md) — current public summary of retrieval, graph, verifier, and operations improvements.
+8. [AI governance alignment](docs/design/ai-governance-alignment.md) — approval boundaries, ownership, data classification, human oversight, and monitoring controls.
+9. [Rebuild from private source](docs/build/rebuild-from-private-source.md) — how to reconstruct the runtime from docs + private repo.
+10. [Operations model](docs/operate/runtime-and-mcp.md) — profile-aware MCP serving and runtime boundaries.
+11. [Evaluation strategy](docs/evaluate/evaluation-strategy.md) — canaries and regression classes.
+12. [RAG improvements release note](docs/evaluate/rag-improvements-release-note.md) — current public summary of retrieval, graph, verifier, and operations improvements.
 
 ## Repository map
 
@@ -189,6 +193,8 @@ Latency controls:
 - **Production controls are part of RAG.** Authority ranking, identity filters, rollout gates, endpoint locality checks, and corpus hygiene are not optional extras; they are what make retrieval safe to operate.
 - **Deterministic tools outrank prose.** Storage sizing and arithmetic belong in calculators first, with RAG as supporting context.
 - **Access policy is retrieval logic.** Public, partner, and internal corpora cannot be separated only at the final answer stage.
+- **Approval boundary is explicit.** RAG controls support governance, but they do not replace approval for the application, providers, data classes, and use case.
+- **Human oversight stays in the loop.** External-facing or high-impact answers should remain reviewable, attributable, and stoppable by an accountable owner.
 - **Graph is advisory.** Ladybug graph signals explain relationships and can provide bounded boosts; they do not make unsupported facts true. Kuzu is treated as a legacy read-only/archive path during retirement.
 - **Graph rollout is gated.** Shadow, canary, guarded-live, and rollback states are safer than an all-at-once graph cutover.
 - **Rebuildability matters.** Every major runtime concept should map to a private script/config path and an external data backup requirement.

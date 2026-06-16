@@ -15,7 +15,8 @@ Each ingested unit should have:
 - stable hashes,
 - embedding vector,
 - lexical-search text,
-- optional graph/entity extraction output.
+- optional graph/entity extraction output,
+- governance metadata such as approved use scope, owner, review status, and retention/removal expectations where applicable.
 
 ## Recommended stages
 
@@ -43,6 +44,8 @@ Normalize sources before embedding:
 - remove navigation boilerplate,
 - record version/product context,
 - avoid mixing multiple documents into one anonymous text blob.
+
+Before ingestion, also record whether the source is approved for the intended RAG use. Treat licensing, data classification, personal/customer/partner data, source-code or telemetry content, and third-party analyst material as approval gates, not as after-the-fact cleanup.
 
 ## Chunking strategy
 
