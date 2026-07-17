@@ -6,7 +6,7 @@ This document describes how the public docs and private source bundle fit togeth
 
 1. This public repo: `ipccheng/NX-Shield-RAG`
 2. Private source repo: `ipccheng/NX-Shield-RAG-src`
-3. External backups for LanceDB/Kuzu/source documents
+3. External backups for LanceDB, Ladybug, and source documents
 4. Secure credential vault for API keys, bot tokens, and OAuth credentials
 5. A clean Hermes Agent installation
 
@@ -29,6 +29,10 @@ The actual scripts and profile prompts are in the private source-recovery bundle
 ```text
 ipccheng/NX-Shield-RAG-src
 ├── rag/hermes-nutanix/                 # active RAG source/config skeleton
+│   ├── src/nx_rag/                     # v4 backend and policy logic
+│   ├── scripts/query/                  # query entrypoints and compatibility shims
+│   ├── servers/                        # MCP and calculator services
+│   └── runtime/ladybug-graph-probe/    # active graph probe/runtime adapter
 ├── openclaw/workspace-scripts/         # legacy/runtime lineage
 ├── hermes/profiles/                    # sanitized profile prompts/config metadata
 ├── ops/launchagents/                   # service templates
@@ -41,7 +45,7 @@ ipccheng/NX-Shield-RAG-src
 Git should not hold large or sensitive runtime data. Restore these from backup artifacts:
 
 - LanceDB stores,
-- Kuzu databases,
+- Ladybug graph stores,
 - source-document corpus,
 - Hindsight/Postgres dumps if used,
 - session databases if needed for audit only.
@@ -63,8 +67,9 @@ Git should not hold large or sensitive runtime data. Restore these from backup a
 
 - [ ] No secrets copied from Git.
 - [ ] LanceDB opens and expected tables are visible.
-- [ ] Kuzu opens read-only and graph labels/relationships are visible.
+- [ ] Ladybug opens and expected graph labels/relationships are visible.
 - [ ] RAG MCP exposes `hermes_master_search` or equivalent canonical tool name.
+- [ ] Each MCP service identity matches its environment, process arguments, and policy profile.
 - [ ] Storage calculator tool path works for sizing queries.
 - [ ] Evidence Ledger appears in RAG output.
 - [ ] Weak-evidence queries return caution instead of confident guesses.

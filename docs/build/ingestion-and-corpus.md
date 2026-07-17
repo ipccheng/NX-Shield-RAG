@@ -29,9 +29,9 @@ flowchart LR
   H --> E[Embeddings]
   H --> X[Entity extraction]
   E --> L[LanceDB rows]
-  X --> K[Kuzu graph backfill]
+  X --> G[Ladybug graph load]
   L --> I[Indexes]
-  K --> V[Canaries]
+  G --> V[Canaries]
   I --> V
 ```
 
@@ -79,9 +79,8 @@ Private source files that correspond to ingestion:
 ipccheng/NX-Shield-RAG-src
 ├── rag/hermes-nutanix/ingestion/
 ├── rag/hermes-nutanix/ingestion/openclaw_pipeline/
-├── rag/hermes-nutanix/scripts/openclaw/tagger_v3.py
-├── rag/hermes-nutanix/scripts/openclaw/kuzu_writer.py
-└── rag/hermes-nutanix/scripts/openclaw/kuzu_backfill.py
+├── rag/hermes-nutanix/ingestion/tagger_v3.py
+└── rag/hermes-nutanix/runtime/ladybug-graph-probe/scripts/ladybug_graph_probe.py
 ```
 
 These paths are implementation references, not public dependencies.

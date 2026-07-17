@@ -1,4 +1,4 @@
-# Graph Context with Kuzu
+# Graph Context with Ladybug
 
 NX-Shield uses graph context as a retrieval signal, not as a truth oracle.
 

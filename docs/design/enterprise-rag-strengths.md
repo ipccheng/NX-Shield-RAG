@@ -49,7 +49,7 @@ The redundancy is deliberate: it makes misses easier to detect and recover from.
 
 ### 6. Graph context is advisory and auditable
 
-Kuzu graph context is used as structural signal. It can explain why chunks are related, suggest nearby source families, and support graph-expanded retrieval, but it does not make a claim true by itself.
+Ladybug graph context is used as structural signal. It can explain why chunks are related, suggest nearby source families, and support graph-expanded retrieval, but it does not make a claim true by itself.
 
 The key discipline is:
 

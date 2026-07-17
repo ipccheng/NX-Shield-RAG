@@ -53,17 +53,22 @@ The intended ranking posture is:
 
 This reduces the risk of lower-authority snippets outranking official sources for operational answers.
 
-### 5. Ladybug is the primary active graph DB
+### 5. Explicit source requests preserve operational authority
+
+When a user explicitly requests the Nutanix Bible, relevant Bible evidence can be promoted into the visible evidence set. For operational procedures, current Portal and KB evidence retains precedence, while Bible material contributes architecture and design depth.
+
+Exact-ID lookups bypass broad source-family promotion, and promotion provenance remains available to evaluation and audit paths.
+
+### 6. Ladybug is the active graph DB
 
 The active graph posture has been updated:
 
-- **Ladybug** is shown as the primary graph DB on the active query path.
-- **Kuzu** is treated as a legacy read-only/archive path during retirement.
+- **Ladybug** is the graph DB on the active query path.
 - Graph output remains a bounded ranking and explanation signal, not a source of truth by itself.
 
 This makes graph migration safer: the graph can help retrieval ranking and explain related concepts, but answer claims still require source-backed evidence.
 
-### 6. Answer verification is a first-class control layer
+### 7. Answer verification is a first-class control layer
 
 The design includes an answer-verification posture with outcomes such as:
 
@@ -74,7 +79,7 @@ The design includes an answer-verification posture with outcomes such as:
 
 The verifier is intended to catch unsupported claims, over-strong absolutes, missing weak-evidence disclosures, and cases where the answer deflects even though actionable evidence exists.
 
-### 7. Provider failures fail closed
+### 8. Provider failures fail closed
 
 Embedding and reranking services are treated as dependencies that can fail independently from corpus quality.
 
@@ -85,7 +90,7 @@ The design now calls out provider response hardening:
 - retry boundedly where appropriate,
 - fail closed with a clear dependency error instead of misclassifying the issue as a retrieval or data-corruption problem.
 
-### 8. Evaluation and canaries guide promotion
+### 9. Evaluation and canaries guide promotion
 
 Promotion decisions should be backed by report-only evaluations and canaries instead of intuition or one-off examples.
 
@@ -103,13 +108,15 @@ Useful tracked dimensions include:
 
 Graph ranking, verifier enforcement, and broad corpus changes should move through shadow, canary, guarded-live, and rollback-aware stages.
 
-### 9. Identity and access boundaries are explicit
+### 10. Identity and access boundaries are explicit
 
 The design supports multiple agent identities and access policies, including internal, customer-visible, partner-facing, and profile-specific retrieval boundaries.
 
 Access policy is treated as retrieval logic. Public, partner, and internal corpora must not be separated only at final answer generation time.
 
-### 10. Operational reliability is part of the architecture
+The production gate preserves identity semantics: retrieval-time forbidden-source matches block every identity; restricted evidence under public, partner, or unknown identities is blocking; explicitly allowlisted internal telemetry is reported separately rather than discarded. Missing identities are handled conservatively as unknown.
+
+### 11. Operational reliability is part of the architecture
 
 The design distinguishes among several failure layers:
 
@@ -127,8 +134,7 @@ This reduces unnecessary store mutation, re-ingestion, or service restarts when 
 
 The public query-path diagram has been refreshed to reflect the current posture:
 
-- Ladybug primary graph DB,
-- Kuzu legacy archive / retiring,
+- Ladybug graph DB,
 - LanceDB hybrid retrieval as the evidence source of truth,
 - graph as bounded ranking signal,
 - current-question-focused MCP bridge,
@@ -158,7 +164,6 @@ The gains are expected to be less dramatic for simple factual queries that were 
 The following areas should remain gated by evaluation, rollback planning, and explicit operating decisions:
 
 - broader graph-ranking promotion,
-- final Kuzu retirement and deletion,
 - active graph orphan repair,
 - broad corpus pruning,
 - verifier enforcement expansion,

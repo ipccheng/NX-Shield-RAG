@@ -37,7 +37,7 @@ flowchart LR
     L[LanceDB hybrid index]
     F[FTS / lexical]
     E[Exact matches]
-    K[Kuzu graph context]
+    G[Ladybug graph context]
     T[Deterministic calculators]
   end
 
@@ -57,12 +57,12 @@ flowchart LR
   V --> L
   V --> F
   V --> E
-  V --> K
+  V --> G
   O --> T
   L --> RRF
   F --> RRF
   E --> RRF
-  K --> RRF
+  G --> RRF
   T --> RRF
   RRF --> DIV --> RR --> LED --> RULE --> OUT
 ```
@@ -95,9 +95,13 @@ LanceDB is the center because it holds the searchable corpus and metadata used b
 
 The important implementation detail is not the live row count; it is the contract: every row must carry source authority, access policy, product/version metadata, stable identity, search text, an embedding vector, and lineage. This lets the runtime prefer official Portal refresh rows, preserve exact KB lookups, route comparison queries to competitive collateral when appropriate, and still keep older migrated evidence auditable.
 
-### Kuzu graph context
+### Source-intent and operational-authority precedence
 
-Kuzu stores entities and relationships so retrieval can notice structural proximity: products, features, errors, KBs, hardware families, and related concepts. It is a recall and explanation aid, not a primary truth store.
+Post-ranking precedence is bounded by query intent. An explicit request for the Nutanix Bible can promote relevant Bible evidence, while operational procedures continue to prefer current Portal and KB sources. Exact-ID lookups bypass broad source promotion, and every promotion should retain provenance so the ordering decision remains auditable.
+
+### Ladybug graph context
+
+Ladybug stores entities and relationships so retrieval can notice structural proximity: products, features, errors, KBs, hardware families, and related concepts. It is a recall and explanation aid, not a primary truth store.
 
 ### Calculator-first tools
 

@@ -32,7 +32,7 @@ Example user question:
 
 > Can you provide a detailed comparison of VMware Cloud Foundation (VCF) 9.1 and Nutanix AOS 7.5?
 
-![NX-Shield RAG current query path with Ladybug primary graph DB and Kuzu legacy archive](diagrams/sample-query-path-vcf-aos.png)
+![NX-Shield RAG current query path with Ladybug graph context](diagrams/sample-query-path-vcf-aos.png)
 
 This is a comparison query, so the RAG path is deliberately different from a single factual lookup. The goal is not only to retrieve chunks, but to produce balanced evidence for both products and make weak coverage visible before answer generation.
 
@@ -66,7 +66,7 @@ The implementation keeps the fan-out bounded for latency:
 
 ### 3. Add graph context, but do not let graph become truth
 
-In parallel with query planning, the active graph layer is queried for entity and relationship hints. The current design uses Ladybug as the primary graph DB, with Kuzu retained only as a legacy read-only archive during retirement. For this sample, graph context might surface relationships among AOS, AHV, Prism, VCF, ESXi/vSphere, lifecycle tools, and storage concepts.
+In parallel with query planning, Ladybug is queried for entity and relationship hints. For this sample, graph context might surface relationships among AOS, AHV, Prism, VCF, ESXi/vSphere, lifecycle tools, and storage concepts.
 
 Graph matches can boost or annotate retrieved chunks, but they do not create answer claims by themselves. A graph edge is treated as structural signal; the final answer still needs source-backed evidence.
 
@@ -81,7 +81,13 @@ The LanceDB vector/FTS channels are fused with Reciprocal Rank Fusion (RRF):
 
 The top fused candidates are then expanded with nearby chunk context and sent to a cross-encoder reranker. The private implementation uses a bounded rerank pool and returns a small final set, usually the top five evidence items, to keep answer latency and context size controlled.
 
-### 5. Build the Evidence Ledger
+### 5. Respect explicit source intent without weakening operational authority
+
+If the user explicitly asks for the Nutanix Bible, relevant Bible evidence is promoted so the requested source is visible. For operational procedures, current Portal and KB evidence still takes precedence; Bible material adds architecture and design depth rather than replacing current operational guidance.
+
+Exact-ID lookups bypass broad source promotion, and promotion metadata remains visible for evaluation and audit.
+
+### 6. Build the Evidence Ledger
 
 Before final writing, the system summarizes what the evidence supports and what remains weak:
 
@@ -106,7 +112,7 @@ answer_rules:
   - prefer concise comparison tables only after the evidence coverage is clear
 ```
 
-### 6. Use Slack or Web only as fallbacks
+### 7. Use Slack or Web only as fallbacks
 
 The normal path is local evidence first. Slack and Web are waterfall fallbacks, not primary sources:
 
@@ -139,10 +145,11 @@ Accuracy controls:
 - alias expansion for acronyms and product names,
 - hybrid vector + full-text retrieval,
 - scalar access/source filters,
-- Ladybug graph hints as bounded boosts only, with Kuzu retained only as a legacy archive during retirement,
+- Ladybug graph hints as bounded boosts only,
 - RRF fusion across independent channels,
 - cross-encoder reranking,
 - source-authority and metadata multipliers with caps,
+- explicit-source and operational-authority precedence with provenance,
 - Evidence Ledger answer obligations and weak-evidence notes,
 - explicit fallback policy for Slack and Web.
 
@@ -195,7 +202,7 @@ Latency controls:
 - **Access policy is retrieval logic.** Public, partner, and internal corpora cannot be separated only at the final answer stage.
 - **Approval boundary is explicit.** RAG controls support governance, but they do not replace approval for the application, providers, data classes, and use case.
 - **Human oversight stays in the loop.** External-facing or high-impact answers should remain reviewable, attributable, and stoppable by an accountable owner.
-- **Graph is advisory.** Ladybug graph signals explain relationships and can provide bounded boosts; they do not make unsupported facts true. Kuzu is treated as a legacy read-only/archive path during retirement.
+- **Graph is advisory.** Ladybug graph signals explain relationships and can provide bounded boosts; they do not make unsupported facts true.
 - **Graph rollout is gated.** Shadow, canary, guarded-live, and rollback states are safer than an all-at-once graph cutover.
 - **Rebuildability matters.** Every major runtime concept should map to a private script/config path and an external data backup requirement.
 

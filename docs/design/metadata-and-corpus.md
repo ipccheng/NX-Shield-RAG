@@ -8,7 +8,7 @@ The active unified v4 corpus uses these field groups. See [LanceDB schema](lance
 
 A robust technical-support corpus should include fields like:
 
-- `source_family` — Portal docs, support KB, validated design, competitive collateral, team chat, Helm/chart, advisory, legacy import, etc.
+- `source_family` — Portal docs, support KB, Nutanix Bible, validated design, competitive collateral, team chat, Helm/chart, advisory, legacy import, etc.
 - `source_type` — support KB, official documentation, API spec, competitive enablement, field discussion, and similar source-specific types.
 - `source_authority` / `source_authority_score` — coarse authority class plus a bounded numeric signal.
 - `access_scope` / `confidentiality` — public, partner, internal, support-portal, or similar policy classes.
@@ -29,6 +29,18 @@ Different source families carry different risk:
 - Team chat can be useful internally but should not be exposed in public/partner modes.
 
 The answer layer should know which family each claim came from.
+
+## Explicit source intent and operational authority
+
+Source authority and user source intent are related but distinct controls:
+
+- If a user explicitly asks for the Nutanix Bible, the retrieval path may promote relevant Bible evidence so the requested source is visible.
+- For operational procedures, current Portal and KB evidence retains precedence; Bible material should add architectural depth rather than displace current operational authority.
+- Exact-ID requests remain deterministic lookups and bypass broad source-family promotion.
+- Current and retained historical editions should remain separately identifiable unless exact supersession has been proven.
+- Post-ranking promotions should be bounded and recorded in provenance metadata so evaluations can explain why order changed.
+
+This pattern satisfies explicit source requests without treating every source family as equally authoritative for every query class.
 
 ## Unified corpus concept
 

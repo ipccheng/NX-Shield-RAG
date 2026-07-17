@@ -21,6 +21,8 @@ An enterprise RAG can leak information when:
 5. **Surface policy in the evidence ledger.** A blocked answer should say evidence is unavailable under the current policy.
 6. **Keep public docs sanitized.** No tokens, private hostnames, local-only counts, or private operational details.
 7. **Keep approval status separate from technical controls.** Access filters, evidence ledgers, and local storage support governance; they do not by themselves approve the application, provider path, data class, or use case.
+8. **Require identity consistency.** Environment, process arguments, and policy configuration must resolve to the same serving identity; startup and canaries fail closed on mismatch.
+9. **Treat unknown identity conservatively.** Missing or unrecognized identities never inherit internal access.
 
 ## Profiles and identities
 

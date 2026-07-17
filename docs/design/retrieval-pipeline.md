@@ -14,7 +14,7 @@ sequenceDiagram
   participant Planner as Deterministic router
   participant LanceDB
   participant Exact as Exact/Ripgrep path
-  participant Kuzu
+  participant Ladybug
   participant Calc as Calculator
   participant Ledger
 
@@ -23,11 +23,11 @@ sequenceDiagram
   MCP->>Planner: classify intent + build bounded routes
   Planner->>LanceDB: vector + FTS + scalar-filtered channels
   Planner->>Exact: exact identifiers / lexical safety net
-  Planner->>Kuzu: graph context when useful
+  Planner->>Ladybug: graph context when useful
   Planner->>Calc: deterministic sizing/math if needed
   LanceDB-->>MCP: candidate evidence
   Exact-->>MCP: exact lexical evidence
-  Kuzu-->>MCP: structural hints
+  Ladybug-->>MCP: structural hints
   Calc-->>MCP: computed result + assumptions
   MCP->>Ledger: RRF, dedup, bounded boosts, weak-evidence notes
   Ledger-->>Agent: evidence packet + answer rules
@@ -93,7 +93,13 @@ A useful pipeline should not just concatenate results. NX-Shield uses these idea
 - **Bounded boosts** so metadata/source authority helps ranking without overpowering actual relevance.
 - **Exact-identity promotion** for KB-only lookups, because an exact KB query is an identity search before it is a semantic search.
 - **Comparison-collateral routing** for explicit comparison questions, so competitive/battlecard evidence can appear alongside official product evidence instead of being buried by Portal-only boosts.
+- **Explicit-source precedence** so a direct request for the Nutanix Bible surfaces relevant Bible evidence.
+- **Operational-authority precedence** so current Portal and KB evidence leads operational procedures while architectural background remains available for depth.
 - **Weak-evidence detection** so one-sided or low-authority evidence triggers caution.
+
+### Precedence guardrails
+
+Source precedence is applied only after independent retrieval channels have produced a fused candidate set. Exact-ID requests bypass broad source promotion, and each promotion should carry provenance metadata so evaluation can explain why ordering changed. Current and retained historical editions remain separately identifiable unless exact supersession has been proven.
 
 ## Architecture/supportability queries
 

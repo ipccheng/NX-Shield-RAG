@@ -10,7 +10,7 @@ Early work focused on search channels, routing, and reranking. Later work showed
 
 ### Graph boost is useful but insufficient
 
-Kuzu graph context improved structural recall and explanation. It did not replace source evidence. The graph is now treated as advisory context.
+Ladybug graph context improves structural recall and explanation. It does not replace source evidence. The graph is treated as advisory context.
 
 The safe rollout pattern is graph-shadow first: compare baseline evidence with graph-assisted candidates in reports before changing served ranking or answer generation.
 

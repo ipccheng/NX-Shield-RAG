@@ -32,6 +32,10 @@ Recommended service split:
 
 This allows independent restart, logging, policy, and rollback.
 
+### Identity consistency invariant
+
+Each service must declare the same serving identity in its environment, process arguments, and policy configuration. A partner/public-facing service must never inherit an internal identity through a copied LaunchAgent or default argument. Startup validation and canaries should fail closed on an identity mismatch or missing identity.
+
 ## Current public-safe runtime shape
 
 The current deployed shape behind this design is:
@@ -42,7 +46,7 @@ The current deployed shape behind this design is:
 - the same service-side tool concept, `hermes_master_search`, exposed through each profile,
 - retrieval-time stale-KB policy rather than destructive deletion,
 - deterministic routing for exact KB, limit/fact, and explicit comparison queries,
-- optional graph/backfill context kept separate from the LanceDB schema contract,
+- Ladybug graph context kept separate from the LanceDB evidence schema contract,
 - service-safe graph probe mode for graph backend canaries,
 - graph ranking promoted only through shadow, guarded-canary, and rollback-gated live steps,
 - answer-verifier shadow checks before any delivery enforcement.
@@ -75,6 +79,7 @@ A healthy runtime is not proven by "the process is running." Verify:
 - profile-level agent calls use RAG before answering domain questions,
 - calculator-first sizing queries call calculator path,
 - access-policy canaries do not retrieve disallowed source families,
+- the service identity matches its environment, launch arguments, and policy profile,
 - answer-verifier shadow reports are generated for the same live turn,
 - verifier delivery decisions are logged before sending the final response,
 - graph-shadow evaluation is report-only until promoted.
@@ -102,7 +107,7 @@ ipccheng/NX-Shield-RAG-src
 ├── ops/launchagents/
 ├── rag/hermes-nutanix/config/mcp.yaml
 ├── rag/hermes-nutanix/config/gateway_config.json
-├── rag/hermes-nutanix/scripts/openclaw/universal_gateway_mcp.py
+├── rag/hermes-nutanix/servers/universal_gateway_mcp.py
 └── hermes/profiles/{sam,nx-shield}/
 ```
 

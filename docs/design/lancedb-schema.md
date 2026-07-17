@@ -27,9 +27,10 @@ The active schema is designed for hybrid retrieval:
 | --- | --- | --- |
 | Vector | `vector` | Semantic recall over embedded evidence chunks. |
 | Full-text | `search_text` | Exact terms: KB IDs, versions, commands, errors, product names, acronyms. |
-| Identity | `chunk_hash`, `content_hash`, `unique_page_key`, `guide_id`, `page_id` | Deduplication, lineage, rebuild checks, and page/document targeting. |
-| Policy/source | `source_family`, `source_type`, `access_scope`, `confidentiality`, `migration_source` | Access filtering, source routing, and lineage-aware ranking. |
+| Identity | `chunk_hash`, `content_hash`, `unique_page_key`, `guide_id`, `page_id`, `exact_identifiers`, `identifier_types` | Deduplication, lineage, rebuild checks, exact-ID lookup, and page/document targeting. |
+| Policy/source | `source_family`, `source_type`, `access_scope`, `effective_access_class`, `confidentiality`, `policy_conflict_flags`, `migration_source` | Access filtering, source routing, policy-conflict review, and lineage-aware ranking. |
 | Version/product | `software_type`, `software_version_normalized` | Product/version narrowing and version-sensitive canaries. |
+| Lifecycle/review | `publication_status`, `ingestion_state`, `freshness_status`, `review_status`, `last_verified_at` | Source lifecycle, freshness, and review-state audits. |
 
 ## Field groups
 
@@ -38,7 +39,7 @@ The active schema is designed for hybrid retrieval:
 | Field | Type | Role |
 | --- | --- | --- |
 | `schema_version` | string | Schema contract marker for rebuild compatibility. |
-| `chunk_hash` | string | Stable chunk identity used for dedupe and Kuzu/LanceDB parity. |
+| `chunk_hash` | string | Stable chunk identity used for dedupe and graph/LanceDB parity. |
 | `content_hash` | string | Text/content hash used for duplicate detection. |
 | `doc_id` | string | Stable document identity; legacy rows preserve their original lineage here. |
 | `guide_id` | string | Portal guide or document-family identifier when available. |
@@ -48,6 +49,8 @@ The active schema is designed for hybrid retrieval:
 | `unique_chunk_key` | string | Stable chunk identity within page/section lineage. |
 | `chunk_index` | int64 | Chunk ordinal. |
 | `chunk_count` | int64 | Number of chunks in the source page/document unit. |
+| `exact_identifiers` | list<string> | Normalized exact identifiers such as KB, advisory, model, or document IDs; supports a label-list lookup lane. |
+| `identifier_types` | list<string> | Identifier classes paired with `exact_identifiers`. |
 
 ### Source authority and citation
 
@@ -84,17 +87,32 @@ The active schema is designed for hybrid retrieval:
 | `modified_date` | string | Modified date if available. |
 | `doc_status` | string | Active/deprecated/stale status marker. |
 | `is_deprecated` | bool | Deprecated-source flag. |
+| `publication_status` | string | Publication-state normalization used by source-freshness policy. |
+| `ingestion_state` | string | Ingestion lifecycle state for staged, promoted, or review-required rows. |
+| `freshness_status` | string | Normalized freshness posture used by stale-source policy and audits. |
+| `review_status` | string | Human or automated review state for the row. |
+| `last_verified_at` | string | Last verification timestamp when available. |
+| `verification_method` | string | How source validity or metadata was verified. |
 
 ### Access and policy
 
 | Field | Type | Role |
 | --- | --- | --- |
 | `access_scope` | string | Retrieval access class such as public, partner, internal, or support-portal. |
+| `effective_access_class` | string | Normalized access class after policy reconciliation. |
 | `confidentiality` | string | Confidentiality class used by policy canaries. |
 | `partner_allowed` | bool | Whether partner-facing retrieval may use the row. |
 | `nx_shield_allowed` | bool | Whether the NX-Shield profile may use the row. |
 | `sam_allowed` | bool | Whether the internal/Sam profile may use the row. |
-| `tenant_policy_tags` | list<string/null> | Reserved policy tags for tenant/profile-specific filtering. |
+| `tenant_policy_tags` | list<string> | Reserved policy tags for tenant/profile-specific filtering. |
+| `policy_conflict_flags` | list<string> | Conflicting or incomplete policy signals that require conservative handling or review. |
+
+### Compatibility columns
+
+| Field | Type | Role |
+| --- | --- | --- |
+| `tenant_policy_tags_legacy_null` | list<null> | Compatibility column retained for rows migrated before typed policy tags were introduced. |
+| `quality_flags_legacy_null` | list<null> | Compatibility column retained for rows migrated before typed quality flags were introduced. |
 
 ### Text and embedding payload
 
@@ -121,10 +139,10 @@ The active schema is designed for hybrid retrieval:
 | `version_mentions_raw` | list<string> | Raw version strings seen in source text. |
 | `features` | list<string> | Feature/topic mentions. |
 | `kb_ids` | list<string> | KB identifiers referenced by the row. |
-| `api_names` | list<string/null> | API names/endpoints where applicable. |
+| `api_names` | list<string> | API names/endpoints where applicable. |
 | `hardware_models` | list<string> | Hardware model mentions. |
 | `content_types` | list<string> | Content classifications such as troubleshooting, architecture, API reference, competitive intelligence, or release notes. |
-| `quality_flags` | list<string/null> | Reserved extraction/quality flags. |
+| `quality_flags` | list<string> | Reserved extraction/quality flags. |
 | `extraction_warnings` | list<string> | Non-fatal extraction warnings. |
 
 ### Ingestion and lineage
@@ -152,6 +170,8 @@ The active design uses lineage buckets rather than hiding source generation insi
 - `native_v4_portal_kb_refresh` — refreshed Portal support KB rows.
 - `native_v4_artifacthub_helm_refresh` — Helm/chart metadata refresh rows.
 - `native_v4_field_advisory_pdf` — field advisory PDF extraction rows.
+- `v4_native_nutanix_bible_scoped_refresh` — targeted Nutanix Bible evidence with explicit source lineage.
+- `v4_native_nutanix_bible_expanded_stage` — broader Nutanix Bible coverage promoted after retrieval, identity, and provenance gates.
 
 These names are operational lineage labels, not public API guarantees.
 
@@ -163,6 +183,9 @@ The schema supports several current ranking behaviors:
 - Exact KB-only queries are treated as identity lookups; matching KB rows should outrank unrelated semantic neighbors.
 - Explicit comparison queries can add a scoped competitive-collateral channel while preserving official product evidence.
 - Stale support KB handling is retrieval-time policy, not destructive deletion: stale rows can be suppressed, demoted, or preserved with warning metadata for exact KB lookups.
+- Explicit Nutanix Bible requests can promote Bible evidence when it satisfies the user’s source intent.
+- Operational procedures still prefer current Portal/KB evidence over architectural background; Bible evidence adds depth without displacing current operational authority.
+- Exact-ID lanes bypass broad source-precedence promotion, and any post-ranking promotion should remain visible in provenance metadata.
 - Access policy is enforced before final evidence is handed to the profile/agent; it is not only a final-answer filter.
 
 ## Schema evolution rule

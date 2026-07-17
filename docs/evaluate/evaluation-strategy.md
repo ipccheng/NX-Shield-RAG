@@ -34,6 +34,17 @@ Measure whether the evidence packet is honest:
 
 A good evidence packet should make the final answer posture obvious before the model writes prose.
 
+## Identity-aware production gate
+
+Restricted-evidence findings must preserve the serving identity instead of being aggregated into one identity-neutral flag:
+
+- A retrieval-time forbidden-source match is a blocker for every identity.
+- Restricted evidence under public, partner, customer-visible, or unknown identities is a blocker.
+- Internal-profile restricted-evidence telemetry may be reported separately when that identity is explicitly allowlisted; it must not be silently discarded or treated as proof that a lower-trust profile can use the same evidence.
+- A missing or unrecognized identity is handled conservatively as unknown, not assumed to be internal.
+
+Reports should separate blocking `restricted_evidence_findings` from non-blocking `allowed_restricted_evidence_findings`. This keeps the production gate fail-closed for lower-trust identities while preserving useful internal telemetry.
+
 ## Final answer checks
 
 Measure the answer the user actually sees:
@@ -87,6 +98,8 @@ Keep a small suite of human-meaningful canaries:
 - storage sizing,
 - product comparison,
 - exact KB/article lookup,
+- explicit Nutanix Bible request,
+- operational-authority query where current Portal/KB evidence should lead architectural background,
 - graph-adjacent concept query,
 - intentionally weak evidence query,
 - disallowed internal-source query,
