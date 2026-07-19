@@ -74,6 +74,26 @@ Likely cause: the gateway wrapped the live question with previous answer context
 
 Fix: extract and route the current question first. Use previous-turn context only as a secondary signal, and add canaries for both clean and wrapped query shapes.
 
+## Backup reliability model
+
+Keep large or sensitive runtime data outside Git, but keep the backup logic and recovery contract under source control.
+
+For each mandatory backup stage:
+
+1. Write into a per-run staging or hidden partial path.
+2. Record an initial manifest before long-running work and checkpoint it between stages.
+3. Apply a bounded child timeout while keeping the scheduler timeout above the full stage budget.
+4. Validate the artifact format and content before promotion—for example ZIP member/CRC checks, gzip integrity, a database-dump header, or a representative restore smoke test.
+5. Atomically promote only a validated artifact into the trusted archive directory.
+6. Move incomplete or corrupt residue into a clearly separated failed-run area; never leave it with a success-looking name beside trusted backups.
+7. Keep backup directories and artifacts private because archives may contain credentials, profile state, and internal source material.
+
+Regeneratable runtime caches should not be treated as authoritative backup content. If a cache contains a browser- or service-owned SQLite database, exclude only the narrowly identified root cache path rather than weakening coverage for user data or active stores.
+
+Active data-store coverage should follow the current architecture. A RAG recovery set normally includes source documents, the vector store, the active graph store, and any legacy graph required for rollback. Skip or quiesce a snapshot when a likely writer is active.
+
+Retention is a separate safety decision. Measure per-run growth and restore confidence before enabling deletion; a successful backup job is not by itself approval to prune old recovery points.
+
 ## Canary categories
 
 - exact identifier query,

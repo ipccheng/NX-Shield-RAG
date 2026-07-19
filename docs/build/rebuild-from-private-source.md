@@ -36,6 +36,7 @@ ipccheng/NX-Shield-RAG-src
 ├── openclaw/workspace-scripts/         # legacy/runtime lineage
 ├── hermes/profiles/                    # sanitized profile prompts/config metadata
 ├── ops/launchagents/                   # service templates
+├── ops/backups/hermes/                 # backup source, tests, and scoped upstream patches
 ├── reports/exchange/                   # milestone and canary records
 └── tools/scan_source_safety.py         # source safety scanner
 ```
@@ -66,6 +67,8 @@ Git should not hold large or sensitive runtime data. Restore these from backup a
 ## Rebuild checklist
 
 - [ ] No secrets copied from Git.
+- [ ] Backup source passes syntax and fault-injection tests before cron is enabled.
+- [ ] Restored ZIP/gzip/database artifacts pass integrity checks and a representative restore smoke test.
 - [ ] LanceDB opens and expected tables are visible.
 - [ ] Ladybug opens and expected graph labels/relationships are visible.
 - [ ] RAG MCP exposes `hermes_master_search` or equivalent canonical tool name.
