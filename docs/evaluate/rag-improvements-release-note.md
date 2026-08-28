@@ -130,6 +130,16 @@ The design distinguishes among several failure layers:
 
 This reduces unnecessary store mutation, re-ingestion, or service restarts when the real issue is a stale client, malformed provider response, query wrapper problem, or identity-boundary mismatch.
 
+### 12. Source capture and corpus promotion are provenance-controlled
+
+The ingestion design now distinguishes source inventory, canonical identity, structured generated content, published artifacts, extracted sections/pages, and final chunk provenance. Complete current-source coverage is verified by identity and body fingerprints rather than inferred from a matching title or incidental paragraph.
+
+Corpus updates are promoted through isolated candidates with preservation canaries, paired-host parity, frozen rollback bindings, scoped service cutover, and fresh live checks. Incremental/index-preserving candidates are preferred when full index reconstruction changes unrelated approximate-ranking behavior.
+
+### 13. Hardware BOM answers separate arithmetic from supportability
+
+Sizing answers now explicitly separate customer inventory, deterministic resource arithmetic, vendor platform specifications, and final design/supportability validation. Raw capacity is not presented as usable capacity; calculator-valid capacity buckets are not treated as exact orderable SKUs; and N+1, media endurance, licensing, HCL/firmware, performance, rack, power, network, and migration checks remain visible before a preliminary BOM is called validated.
+
 ## Updated public diagram
 
 The public query-path diagram has been refreshed to reflect the current posture:

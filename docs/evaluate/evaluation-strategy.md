@@ -146,6 +146,27 @@ The safer pattern is:
 
 Calculator evidence can be tested in report-only mode by appending an in-memory evidence row to the verifier input. This proves answer quality without writing to the vector store, graph store, or serving path.
 
+## Hardware BOM and replacement-sizing checks
+
+Hardware replacement answers need a claim-support matrix that separates four evidence classes:
+
+1. **customer/source inventory** — quantities, installed processors, physical cores, memory, drive counts, media types, and source units;
+2. **deterministic arithmetic** — aggregate cores, memory, raw capacity, unit conversions, deltas, and post-failure totals;
+3. **vendor platform evidence** — supported CPU/DIMM/drive/NIC/boot options and valid raw-capacity configurations;
+4. **design validation** — usable capacity, RF/HA overhead, performance, endurance, licensing, firmware/HCL, rack/power/network, migration and support entitlement.
+
+Useful regression rules:
+
+- preserve raw TB and usable TiB as different values;
+- exclude boot media from data capacity unless the source scope says otherwise;
+- do not use compression or deduplication to close a formal capacity gap without explicit evidence;
+- show both normal aggregate and one-node-failure capacity;
+- do not equate different CPU generations solely by core count;
+- treat a calculator-valid raw bucket as capacity evidence, not proof of an exact orderable drive SKU;
+- label the result as arithmetic match, preliminary sizing, validated design, or vendor-supported configuration.
+
+The verifier should accept arithmetic derived from current-turn inventory plus calculator output, while still requiring authoritative evidence for hardware supportability and exact BOM claims.
+
 ## Graph-shadow checks
 
 Graph context should be evaluated as a candidate generator or reranking signal before it changes served answers.

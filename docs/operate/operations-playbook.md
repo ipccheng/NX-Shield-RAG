@@ -50,6 +50,25 @@ Likely cause: vector store, graph store, or source artifacts were updated on one
 
 Fix: run a report-first parity check using stable row counts, schema hashes, chunk/document digests, graph node/edge counts, and fresh MCP canaries. Sync only after a destination backup and restart only the scoped RAG services that hold the stores open.
 
+### Candidate passes locally but promotion is unsafe
+
+Symptom: new documents retrieve correctly in a local candidate, but rebuilding indexes changes unrelated ranking canaries or the paired host has a different candidate identity.
+
+Likely cause: approximate-index reconstruction changed ordering, the candidate was built from a different baseline, or source/vector/graph artifacts were not bound to one promotion transaction.
+
+Fix: reject or archive the candidate rather than weakening preservation gates. Rebuild from the same frozen baseline using an incremental/index-preserving strategy, require logical parity on every serving host, and bind promotion plus rollback to exact candidate identities before service quiescence.
+
+## Corpus promotion transaction
+
+A safe multi-host promotion has four explicit phases:
+
+1. **Prepare** — verified backups, immutable candidate identities, rollback scripts, and no active writers.
+2. **Validate** — new-content identity retrieval, preservation canaries, access-policy checks, ranking tests, graph parity, and index completeness.
+3. **Cut over** — stop only scoped services, replace active vector/graph state, and restart through the normal service manager.
+4. **Prove or roll back** — fresh-process direct queries, MCP transport checks, profile/identity canaries, and automatic rollback on any required failure.
+
+Do not describe a successful candidate build as a production promotion. Likewise, a completed but rejected background build remains archival evidence and must not be mistaken for the active candidate.
+
 ### Graph backend migration risk
 
 Symptom: graph retrieval works in a foreground test but causes service instability or native-module conflicts in the long-running runtime.
