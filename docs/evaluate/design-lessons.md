@@ -1,4 +1,6 @@
-# Milestone Lineage
+# RAG Design Lessons
+
+[Documentation index](../README.md) · [Project home](../../README.md)
 
 > **Scope:** Independent project design guidance, not a Nutanix-approved implementation. This page does not establish deployed behavior, measured effectiveness, or vendor support. The public repository does not include a runnable service.
 

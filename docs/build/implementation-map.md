@@ -1,6 +1,8 @@
 # Implementation Responsibility Map
 
-This page maps public design concepts to components an implementing team would need to supply. The filename is retained for existing links; private repository names, paths, and profile identifiers are intentionally not published.
+[Documentation index](../README.md) · [Project home](../../README.md)
+
+This page maps public design concepts to components an implementing team would need to supply. Private repository names, paths, and profile identifiers are intentionally not published.
 
 This repository is an independent design notebook, not a runnable software distribution or a Nutanix-approved implementation. Reading it does not require access to private source.
 
@@ -13,7 +15,7 @@ This repository is an independent design notebook, not a runnable software distr
 | Ingestion and entity extraction | Normalize authorized sources and retain provenance | [Ingestion](ingestion-and-corpus.md) |
 | Graph adapter | Return bounded relationship hints linked to authorized evidence | [Graph context](../design/graph-context.md) |
 | Answer verifier | Compare draft claims with current-turn evidence; gate delivery | [Evaluation](../evaluate/evaluation-strategy.md) |
-| Service configuration and recovery | Declare identities, dependencies, backups, and rollback | [Rebuild prerequisites](rebuild-from-private-source.md) |
+| Service configuration and recovery | Declare identities, dependencies, backups, and rollback | [Rebuild prerequisites](../operate/recovery-model.md) |
 
 ## Maintainer responsibility
 

@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1480" viewBox="0 0 1600 1480">
+<title>NX-Shield RAG: from question to a checkable answer</title>
+<desc>Conceptual six-stage answer path with connected retrieval detail. Access restrictions apply throughout; graph signals are not proof and automated checks do not guarantee correctness.</desc>
+<rect width="1600" height="1480" fill="#0b1220"/>
+<rect x="64" y="32" width="208" height="32" rx="16" fill="#18332f" stroke="none" stroke-width="1"/>
+<text x="80" y="54" fill="#55ddc0" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700">REFERENCE DESIGN</text>
+<text x="64" y="116" fill="#edf4fc" font-family="Arial, Helvetica, sans-serif" font-size="48" font-weight="700">NX-Shield RAG</text>
+<text x="64" y="156" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="29" font-weight="400">From a question to a checkable answer</text>
+<rect x="64" y="188" width="1472" height="52" rx="12" fill="#142033" stroke="#2b3b53" stroke-width="1"/>
+<text x="86" y="222" fill="#edf4fc" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Across every stage: identity • source permissions • allowed model processing • auditability</text>
+<text x="64" y="279" fill="#55ddc0" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">THE ANSWER PATH</text>
+<text x="840" y="279" fill="#80bbff" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">KNOWLEDGE + RETRIEVAL DETAIL</text>
+<rect x="64" y="300" width="710" height="152" rx="16" fill="#121e31" stroke="#2b3b53" stroke-width="1"/>
+<rect x="64" y="300" width="5" height="152" rx="2" fill="#55ddc0" stroke="none" stroke-width="1"/>
+<rect x="86" y="319" width="34" height="34" rx="17" fill="#55ddc0" stroke="none" stroke-width="1"/>
+<text x="96" y="344" fill="#0b1220" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700">1</text>
+<text x="136" y="345" fill="#edf4fc" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Understand the question + caller</text>
+<text x="88" y="378" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Authenticate identity; keep the question in scope.</text>
+<text x="88" y="406" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Preserve exact identifiers and versions.</text>
+<text x="88" y="434" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Unknown identity or denied request → stop.</text>
+<polyline points="419,452 419,478" fill="none" stroke="#55ddc0" stroke-width="2"/>
+<polygon points="419,478 414,469 424,469" fill="#55ddc0"/>
+<rect x="64" y="478" width="710" height="152" rx="16" fill="#121e31" stroke="#2b3b53" stroke-width="1"/>
+<rect x="64" y="478" width="5" height="152" rx="2" fill="#80bbff" stroke="none" stroke-width="1"/>
+<rect x="86" y="497" width="34" height="34" rx="17" fill="#80bbff" stroke="none" stroke-width="1"/>
+<text x="96" y="522" fill="#0b1220" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700">2</text>
+<text x="136" y="523" fill="#edf4fc" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Retrieve evidence and tool results</text>
+<text x="88" y="556" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Run complementary search methods.</text>
+<text x="88" y="584" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Add graph hints or calculations when useful.</text>
+<text x="88" y="612" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Keep retrieved content inside its permitted scope.</text>
+<polyline points="419,630 419,656" fill="none" stroke="#55ddc0" stroke-width="2"/>
+<polygon points="419,656 414,647 424,647" fill="#55ddc0"/>
+<rect x="64" y="656" width="710" height="152" rx="16" fill="#121e31" stroke="#2b3b53" stroke-width="1"/>
+<rect x="64" y="656" width="5" height="152" rx="2" fill="#c1a8ff" stroke="none" stroke-width="1"/>
+<rect x="86" y="675" width="34" height="34" rx="17" fill="#c1a8ff" stroke="none" stroke-width="1"/>
+<text x="96" y="700" fill="#0b1220" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700">3</text>
+<text x="136" y="701" fill="#edf4fc" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Build the evidence ledger</text>
+<text x="88" y="734" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Attach sources, versions, and calculation inputs.</text>
+<text x="88" y="762" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Record which points are supported or missing.</text>
+<text x="88" y="790" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Similarity and keyword overlap are not proof.</text>
+<polyline points="419,808 419,834" fill="none" stroke="#55ddc0" stroke-width="2"/>
+<polygon points="419,834 414,825 424,825" fill="#55ddc0"/>
+<rect x="64" y="834" width="710" height="152" rx="16" fill="#121e31" stroke="#2b3b53" stroke-width="1"/>
+<rect x="64" y="834" width="5" height="152" rx="2" fill="#c1a8ff" stroke="none" stroke-width="1"/>
+<rect x="86" y="853" width="34" height="34" rx="17" fill="#c1a8ff" stroke="none" stroke-width="1"/>
+<text x="96" y="878" fill="#0b1220" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700">4</text>
+<text x="136" y="879" fill="#edf4fc" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Draft an answer from the evidence</text>
+<text x="88" y="912" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Use selected passages and explicit tool results.</text>
+<text x="88" y="940" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Cite sources and state relevant assumptions.</text>
+<text x="88" y="968" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Do not fill evidence gaps with invented claims.</text>
+<polyline points="419,986 419,1012" fill="none" stroke="#55ddc0" stroke-width="2"/>
+<polygon points="419,1012 414,1003 424,1003" fill="#55ddc0"/>
+<rect x="64" y="1012" width="710" height="152" rx="16" fill="#121e31" stroke="#2b3b53" stroke-width="1"/>
+<rect x="64" y="1012" width="5" height="152" rx="2" fill="#f7c66b" stroke="none" stroke-width="1"/>
+<rect x="86" y="1031" width="34" height="34" rx="17" fill="#f7c66b" stroke="none" stroke-width="1"/>
+<text x="96" y="1056" fill="#0b1220" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700">5</text>
+<text x="136" y="1057" fill="#edf4fc" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Check the draft against its evidence</text>
+<text x="88" y="1090" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Check support, citations, caveats, and access.</text>
+<text x="88" y="1118" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Revise within a fixed budget and recheck.</text>
+<text x="88" y="1146" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Unresolved failures must not become normal answers.</text>
+<polyline points="419,1164 419,1190" fill="none" stroke="#55ddc0" stroke-width="2"/>
+<polygon points="419,1190 414,1181 424,1181" fill="#55ddc0"/>
+<rect x="64" y="1190" width="710" height="152" rx="16" fill="#121e31" stroke="#2b3b53" stroke-width="1"/>
+<rect x="64" y="1190" width="5" height="152" rx="2" fill="#55ddc0" stroke="none" stroke-width="1"/>
+<rect x="86" y="1209" width="34" height="34" rx="17" fill="#55ddc0" stroke="none" stroke-width="1"/>
+<text x="96" y="1234" fill="#0b1220" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700">6</text>
+<text x="136" y="1235" fill="#edf4fc" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Deliver an answer—or explain the gap</text>
+<text x="88" y="1268" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Return citations, assumptions, and uncertainty.</text>
+<text x="88" y="1296" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Qualify partial answers; withhold failing claims.</text>
+<text x="88" y="1324" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Automated checks do not guarantee correctness.</text>
+<rect x="840" y="300" width="696" height="152" rx="16" fill="#121e31" stroke="#2b3b53" stroke-width="1"/>
+<text x="864" y="341" fill="#edf4fc" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Prepared knowledge collection</text>
+<text x="864" y="378" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Before questions arrive: parse, chunk, and index.</text>
+<text x="864" y="406" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Store source links, versions, and access metadata.</text>
+<text x="864" y="434" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Only ingest material permitted for the intended use.</text>
+<polyline points="1188,452 1188,478" fill="none" stroke="#80bbff" stroke-width="2"/>
+<polygon points="1188,478 1183,469 1193,469" fill="#80bbff"/>
+<rect x="840" y="478" width="696" height="690" rx="18" fill="#0e192a" stroke="#80bbff" stroke-width="1"/>
+<text x="864" y="516" fill="#80bbff" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="700">Inside step 2: retrieval and tools</text>
+<rect x="860" y="540" width="656" height="132" rx="12" fill="#121e31" stroke="#2b3b53" stroke-width="1"/>
+<text x="880" y="572" fill="#edf4fc" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700">A  Search with complementary methods</text>
+<text x="880" y="604" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="400">Meaning-based vectors + keyword search.</text>
+<text x="880" y="631" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="400">Exact lookups protect document identifiers.</text>
+<text x="880" y="658" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="400">LanceDB: permitted passages + source metadata.</text>
+<polyline points="1188,672 1188,682" fill="none" stroke="#80bbff" stroke-width="1"/>
+<polygon points="1188,682 1183,673 1193,673" fill="#80bbff"/>
+<rect x="860" y="682" width="656" height="132" rx="12" fill="#121e31" stroke="#2b3b53" stroke-width="1"/>
+<text x="880" y="714" fill="#edf4fc" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700">B  Use helpers only when needed</text>
+<text x="880" y="746" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="400">Ladybug graph: relationship hints, not proof.</text>
+<text x="880" y="773" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="400">Calculators: repeatable results + assumptions.</text>
+<text x="880" y="800" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="400">Helpers must obey the same access policy.</text>
+<polyline points="1188,814 1188,824" fill="none" stroke="#80bbff" stroke-width="1"/>
+<polygon points="1188,824 1183,815 1193,815" fill="#80bbff"/>
+<rect x="860" y="824" width="656" height="132" rx="12" fill="#121e31" stroke="#2b3b53" stroke-width="1"/>
+<text x="880" y="856" fill="#edf4fc" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700">C  Reconcile permissions, then rank</text>
+<text x="880" y="888" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="400">Resolve conflicting permissions conservatively.</text>
+<text x="880" y="915" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="400">Combine rankings; optionally rerank relevance.</text>
+<text x="880" y="942" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="400">Keep source versions and citations attached.</text>
+<polyline points="1188,956 1188,966" fill="none" stroke="#80bbff" stroke-width="1"/>
+<polygon points="1188,966 1183,957 1193,957" fill="#80bbff"/>
+<rect x="860" y="966" width="656" height="132" rx="12" fill="#121e31" stroke="#2b3b53" stroke-width="1"/>
+<text x="880" y="998" fill="#edf4fc" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700">D  Handle gaps with bounded recovery</text>
+<text x="880" y="1030" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="400">Search additional permitted sources only.</text>
+<text x="880" y="1057" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="400">Recheck access and ranking for new evidence.</text>
+<text x="880" y="1084" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="400">Stop after a fixed budget; expose remaining gaps.</text>
+<text x="864" y="1144" fill="#80bbff" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="400">Return source-linked evidence and explicit gaps.</text>
+<polyline points="774,554 808,554 808,510 840,510" fill="none" stroke="#80bbff" stroke-width="2" stroke-dasharray="7 6"/>
+<polygon points="840,510 831,505 831,515" fill="#80bbff"/>
+<polyline points="840,1136 800,1136 800,732 774,732" fill="none" stroke="#80bbff" stroke-width="2" stroke-dasharray="7 6"/>
+<polygon points="774,732 783,727 783,737" fill="#80bbff"/>
+<polyline points="64,1088 32,1088 32,910 64,910" fill="none" stroke="#f7c66b" stroke-width="2" stroke-dasharray="7 6"/>
+<polygon points="64,910 55,905 55,915" fill="#f7c66b"/>
+<rect x="840" y="1190" width="696" height="152" rx="16" fill="#121e31" stroke="#2b3b53" stroke-width="1"/>
+<text x="864" y="1231" fill="#edf4fc" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Evaluate before enabling controls</text>
+<text x="864" y="1268" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Test claim support, relevance, and denied access.</text>
+<text x="864" y="1296" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Measure latency, failures, and fallback behavior.</text>
+<text x="864" y="1324" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400">Use staged rollout and a tested rollback.</text>
+<polyline points="64,1380 1536,1380" fill="none" stroke="#2b3b53" stroke-width="1"/>
+<text x="64" y="1417" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400">Solid arrows: main flow   •   Dashed arrows: expanded detail or bounded revision</text>
+<text x="64" y="1450" fill="#b3c2d7" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400">RAG = retrieval-augmented generation. Reference design; validate controls for each deployment.</text>
+</svg>

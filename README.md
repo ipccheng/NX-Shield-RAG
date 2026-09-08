@@ -1,91 +1,67 @@
 # NX-Shield RAG
 
-**How to build a technical assistant that finds relevant documents, respects access rules, and explains what its evidence does—and does not—support.**
+**Find relevant evidence. Check the answer. Make uncertainty visible.**
 
-NX-Shield RAG is an independent design notebook for a Nutanix-focused question-answering system. It is written for engineers who understand infrastructure and APIs but may be new to AI. The implementation and recovery source are private; **this repository is documentation, not an installable application or a public source-code release**.
+This is the public engineering handbook for our retrieval-augmented generation (RAG) system. It explains how retrieval, source permissions, evidence checks, and operations fit together—for technical readers who may be new to AI.
 
-> This is not an official Nutanix product, Nutanix Validated Design, support commitment, or compliance certification. Product names identify the technologies discussed; they do not imply endorsement. Use official product documentation for supported configurations and operational procedures.
+The RAG application implementation and recovery source are private. This repository contains **documentation, examples, and diagram-rendering tools—not an installable RAG service**. It is an independent project, not an official Nutanix product or validated design.
 
-## RAG in one minute
+## From a question to a checkable answer
 
-**Retrieval-augmented generation (RAG)** means finding relevant information before asking a language model to write an answer. Think of it as an open-book examination: the assistant first selects useful reference passages, then answers from those passages.
+[![NX-Shield RAG: question and identity, retrieval, evidence ledger, draft, verification, and answer or evidence gap. A connected detail panel explains search, optional helpers, permissions, ranking, and bounded recovery.](diagrams/rag-query-path.png)](diagrams/rag-query-path.png)
 
-For example, when someone asks, “What should I check before an infrastructure upgrade?”:
+[Open full-size PNG](diagrams/rag-query-path.png) · [Editable SVG](diagrams/rag-query-path.svg) · [Diagram source and rendering](diagrams/README.md)
 
-1. The application identifies the product, version, and questions it must answer.
-2. It searches documents the user is allowed to access.
-3. It selects relevant passages, favoring authoritative and version-appropriate sources.
-4. The language model drafts an answer using those passages.
-5. The application checks the draft against the evidence and either delivers it, narrows it, or reports a gap.
-
-This is **not the same as training a model on the documents**. Updating a RAG knowledge collection usually changes the retrieval data, not the model's learned parameters. RAG can improve grounding; it does not guarantee correctness or eliminate hallucinations.
-
-## The system at a glance
-
-```mermaid
-flowchart TD
-  D[Authorized documents] --> I[Parse, split into passages, attach source and access metadata]
-  I --> K[Searchable knowledge collection]
-  U[User question and authenticated identity] --> P[Identify the question and permitted data]
-  P --> R[Retrieve relevant permitted passages]
-  K --> R
-  R --> S[Rank evidence and identify missing support]
-  S --> L[Language model drafts an answer]
-  L --> V[Check claims against evidence]
-  V --> A[Cited answer, qualified answer, or explicit evidence gap]
-```
-
-This is a conceptual flow, not a deployment status report. Access checks must remain effective throughout retrieval, ranking, model calls, fallback paths, and delivery—not just at the front door.
-
-## Why not just use a vector database?
-
-A vector database helps find text with similar meaning. It does not, by itself, decide whether a document is authoritative, current, permitted for the user, or sufficient to support a particular claim.
-
-This design adds:
-
-- **Hybrid search:** combine meaning-based search with keyword and exact-identifier lookup. A similar topic is not necessarily the right KB article or product version.
-- **Source and access policy:** separate “relevant” from “allowed,” and “official” from “appropriate to this question.”
-- **An evidence ledger:** record the questions to answer, supporting passages, and missing evidence before drafting.
-- **Deterministic tools:** use calculators for arithmetic rather than asking the model to guess a result.
-- **Optional graph context:** use relationships between entities as search hints, not proof of a claim.
-- **Answer checks and safe operations:** evaluate quality, disclose limitations, and test changes before enabling them for users.
-
-Each control has limits. A keyword-coverage check is not proof that a passage supports a claim; an automated verifier is not a substitute for expert review of high-impact advice.
+Read the numbered path from top to bottom. The right-hand panel expands retrieval; the dashed revision loop returns a draft for another check. **This is a reference design, not a live deployment or accuracy claim.** Access restrictions and permitted model-processing boundaries apply throughout the path.
 
 ## Start here
 
-### Understand the basics
+New to RAG? Think of it as an open-book answer: the application finds useful reference passages before asking a language model to write. Retrieval changes the information supplied to the model; it is not the same as training the model on those documents.
 
-1. [RAG concepts and glossary](docs/getting-started/rag-basics.md) — embeddings, chunks, reranking, and other terms in plain language.
-2. [Architecture](docs/design/architecture.md) — component responsibilities and boundaries.
-3. [Example question and evidence obligations](examples/query-obligations.md) — what a grounded answer needs to establish.
+Follow the handbook in this order, or jump to your area:
 
-### Design and build
+1. **Understand** — [RAG basics and glossary](docs/getting-started/rag-basics.md). Learn the terms and separate data preparation from question answering.
+2. **Design** — [Architecture](docs/design/architecture.md). Follow the component responsibilities, retrieval path, evidence ledger, and security boundaries.
+3. **Build** — [Ingestion and corpus](docs/build/ingestion-and-corpus.md). Prepare permitted documents, metadata, and searchable indexes.
+4. **Evaluate** — [Evaluation strategy](docs/evaluate/evaluation-strategy.md). Test relevance, claim support, denied access, failure handling, and latency separately.
+5. **Operate** — [Operations playbook](docs/operate/operations-playbook.md). Manage diagnosis, controlled changes, recovery, and rollback.
 
-- [Retrieval pipeline](docs/design/retrieval-pipeline.md) and [evidence ledger](docs/design/evidence-ledger.md).
-- [Metadata and corpus](docs/design/metadata-and-corpus.md), [schema](docs/design/lancedb-schema.md), and [ingestion](docs/build/ingestion-and-corpus.md).
-- [Graph context](docs/design/graph-context.md) and [enterprise design trade-offs](docs/design/enterprise-rag-strengths.md).
-- [Security and access](docs/design/security-and-access.md) and [governance boundaries](docs/design/ai-governance-alignment.md).
+**[Browse the complete documentation index →](docs/README.md)**
 
-### Evaluate and operate
+## Why more than vector search?
 
-- [Evaluation strategy](docs/evaluate/evaluation-strategy.md) — test relevance, correctness, access isolation, and failure handling separately.
-- [Runtime and MCP](docs/operate/runtime-and-mcp.md) and [operations playbook](docs/operate/operations-playbook.md).
-- [Rebuild guide](docs/build/rebuild-from-private-source.md) and [private source map](docs/build/private-source-map.md) — for authorized maintainers; the public repository alone cannot rebuild the system.
-- [Design evolution](docs/evaluate/rag-improvements-release-note.md) and [milestone lineage](docs/evaluate/milestone-lineage.md) — historical context, not live readiness evidence.
+Finding similar text is only one part of answering a technical question. This design also considers:
 
-## Reading the detailed diagrams
+- **Hybrid retrieval:** combine meaning-based search, keywords, and exact identifiers.
+- **Source and access policy:** distinguish relevant evidence from evidence the caller is allowed to use.
+- **An evidence ledger:** record supporting sources, assumptions, and unanswered points before drafting.
+- **Deterministic tools:** compute arithmetic with explicit inputs rather than asking a model to guess.
+- **Optional graph hints:** use relationships to assist search, not to establish facts.
+- **Answer checks:** compare the draft with its evidence, then deliver, qualify, revise, or withhold it.
 
-[Portable query-flow source](diagrams/rag-system.mmd) provides a text-based architecture view. The [advanced query-path illustration](diagrams/sample-query-path-vcf-aos.png) shows additional controls and rollout options.
+These are controls to implement and evaluate—not guarantees of correctness. A citation must support its claim; a keyword match or passing automated check is not enough by itself.
 
-The advanced illustration uses compact implementation terminology. Read the glossary first. Labels such as “approved,” “fail closed,” “supported claims only,” and “public-safe” describe intended controls or publication boundaries—not independently verified compliance or a guarantee that every generated answer is correct. Rollout-gated components must be validated for the actual deployment before use.
+## Repository guide
 
-## Scope and publication rules
+```text
+README.md                 Visual overview and starting points
+CONTRIBUTING.md           Public scope and contribution rules
+docs/README.md            Complete handbook and reading order
+docs/getting-started/     RAG concepts and glossary
+docs/design/              Architecture, retrieval, evidence, metadata, security
+docs/build/               Ingestion and implementation responsibilities
+docs/evaluate/            Test strategy, control checklist, design lessons
+docs/operate/             Runtime, operations, and recovery model
+diagrams/                 PNG, editable SVG, Mermaid, and rendering source
+examples/                 Fictional query and evidence-obligation examples
+templates/                Illustrative evidence-ledger template
+```
 
-- This repository explains our RAG architecture and engineering: ingestion, retrieval, evidence controls, evaluation, and operations. Nutanix solution technical information belongs in the RAG knowledge collection, not in this public repository. Do not publish product feature guides, solution deployment details, or solution-specific integration designs here.
-- No customer data, internal enablement content, licensed analyst extracts, source-document collections, credentials, private operational reports, or live environment details belong here.
-- A right to read a document is not automatically a right to redistribute it or send it to a model provider.
-- Do not use this notebook to infer product licensing, hardware compatibility, official support, or an approved deployment. Those require the applicable authoritative sources and organizational review.
-- No live accuracy percentage, latency promise, availability target, or current rollout status is asserted here. Such claims need reproducible, revision-bound evidence from the environment in question.
+## Scope and publication boundaries
+
+- **Our RAG engineering belongs here. Nutanix solution technical information belongs in the RAG knowledge collection, not in this public repository.** Do not add product feature guides, solution deployment details, or solution-specific integrations—even when their sources are public.
+- Do not publish customer data, internal enablement, licensed analyst extracts, source-document collections, private operational reports, live environment details, or credentials.
+- Permission to read a source does not automatically grant permission to redistribute it or send it to a model service.
+- This handbook does not establish vendor support, licensing, compatibility, formal approval, compliance certification, or production readiness.
 
 See [publication and contribution guidance](CONTRIBUTING.md) before proposing changes.

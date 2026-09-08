@@ -1,5 +1,7 @@
 # Publication and contribution guidance
 
+[Project home](README.md) · [Documentation index](docs/README.md)
+
 This repository shares independent engineering patterns. It is not an official Nutanix publication, approved application, support contract, or compliance certification.
 
 ## Write for technical readers who are new to AI

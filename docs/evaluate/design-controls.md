@@ -1,6 +1,8 @@
-# RAG Design Improvement Summary
+# Design Controls and Validation Gates
 
-This page summarizes proposed retrieval and operating controls. The filename is retained for existing links; this is **not a software release note, deployment attestation, or benchmark report**. No public executable implementation or reproducible performance result accompanies these claims.
+[Documentation index](../README.md) · [Project home](../../README.md)
+
+This page maps proposed retrieval and operating controls to their validation gates. It is **not a software release note, deployment attestation, or benchmark report**. No public RAG application implementation or reproducible performance result accompanies these claims.
 
 NX-Shield RAG is an independent project, not a Nutanix-approved implementation. Deployment owners must separately validate technical behavior, source rights, provider data flows, organizational approval, and any product support or licensing claims.
 
@@ -55,4 +57,4 @@ For multi-host deployments, compare logical store content and policy, not raw fi
 
 ## Diagram and next reading
 
-The [query-path illustration](../../diagrams/sample-query-path-vcf-aos.png) is a conceptual aid, not proof of active components or verified behavior. Use [architecture](../design/architecture.md) for component responsibilities and [governance](../design/ai-governance-alignment.md) for approval boundaries.
+The [query-path illustration](../../diagrams/rag-query-path.png) is a conceptual aid, not proof of active components or verified behavior. Use [architecture](../design/architecture.md) for component responsibilities and [governance](../design/ai-governance-alignment.md) for approval boundaries.

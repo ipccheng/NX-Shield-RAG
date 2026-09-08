@@ -1,6 +1,6 @@
 # RAG concepts for infrastructure engineers
 
-[Home](../../README.md) · Next: [Architecture](../design/architecture.md)
+[Documentation index](../README.md) · [Project home](../../README.md) · Next: [Architecture](../design/architecture.md)
 
 ## Two different workflows
 

@@ -1,12 +1,14 @@
 # Rebuild Prerequisites and Recovery Model
 
+[Documentation index](../README.md) · [Project home](../../README.md)
+
 This is a conceptual recovery checklist for an authorized implementation owner, not an installation guide. This public repository contains no runnable RAG service, dependency lockfile, source corpus, credentials, or tested restore bundle. It cannot reproduce the private implementation on its own.
 
 NX-Shield RAG is an independent project, not a Nutanix-approved implementation. Technical recovery checks do not establish vendor support or approval for a use case.
 
 ## What a reader can reuse
 
-The public documents describe retrieval, ingestion, metadata, evidence-ledger answering, profile-aware serving, and evaluation. Use the [implementation responsibility map](private-source-map.md) to identify the components your team must build or obtain through authorized channels.
+The public documents describe retrieval, ingestion, metadata, evidence-ledger answering, profile-aware serving, and evaluation. Use the [implementation responsibility map](../build/implementation-map.md) to identify the components your team must build or obtain through authorized channels.
 
 ## What an implementation owner must supply
 
@@ -47,4 +49,4 @@ A **canary** is a small representative test used to detect a regression. Passing
 - [ ] The answer verifier and delivery decision are correlated to the same user turn.
 - [ ] Rollback restores a compatible source/configuration/store set and passes fresh canaries.
 
-See [operations](../operate/operations-playbook.md) for candidate promotion and backup controls, and [evaluation](../evaluate/evaluation-strategy.md) for broader release gates.
+See [operations](operations-playbook.md) for candidate promotion and backup controls, and [evaluation](../evaluate/evaluation-strategy.md) for broader release gates.
