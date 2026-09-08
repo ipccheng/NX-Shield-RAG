@@ -1,6 +1,12 @@
 # Runtime and MCP Operations
 
-NX-Shield RAG is served through MCP so different agents can call the same retrieval system through a stable tool boundary.
+> **Scope:** Independent project design guidance, not a Nutanix-approved implementation. This page does not establish deployed behavior, measured effectiveness, or vendor support. The public repository does not include a runnable service.
+
+## Reading this page
+
+**MCP (Model Context Protocol)** exposes tools to an agent application. A **profile** selects application configuration and policy; its permissions must be bound to authenticated identity. A **gateway** connects user/agent requests to services. A **canary** is a representative regression test. **Endpoint locality** asks which machine and process a request actually reaches. A **LaunchAgent** is a macOS service-launch configuration; other platforms use their own process manager.
+
+The reference design exposes RAG through MCP so different agents can call the same retrieval system through a stable tool boundary.
 
 ## Why MCP
 
@@ -36,13 +42,13 @@ This allows independent restart, logging, policy, and rollback.
 
 Each service must declare the same serving identity in its environment, process arguments, and policy configuration. A partner/public-facing service must never inherit an internal identity through a copied LaunchAgent or default argument. Startup validation and canaries should fail closed on an identity mismatch or missing identity.
 
-## Current public-safe runtime shape
+## Reference service shape
 
-The current deployed shape behind this design is:
+An implementation can separate responsibilities as follows; this is not a deployment inventory:
 
-- a Hermes-owned Nutanix RAG service using the unified v4 LanceDB corpus,
+- a RAG service using a compatible unified LanceDB corpus,
 - one internal/default MCP service profile,
-- one partner/NX-Shield-style MCP service profile with stricter access-policy checks,
+- one partner-facing MCP service profile with stricter access-policy checks,
 - the same service-side tool concept, `hermes_master_search`, exposed through each profile,
 - retrieval-time stale-KB policy rather than destructive deletion,
 - deterministic routing for exact KB, limit/fact, and explicit comparison queries,
@@ -63,11 +69,11 @@ A safe store-sync workflow should:
 2. back up the destination stores before copying,
 3. stop only the services that hold the destination stores open,
 4. copy directory-backed vector stores and file-backed graph stores with the correct filesystem semantics,
-5. clear only stale graph sidecars after backup,
+5. retain journal, lock, and recovery files unless the database-specific recovery procedure explicitly permits removal after backup and writer shutdown,
 6. reopen/checkpoint the copied graph store before service restart,
 7. verify fresh MCP clients for every serving profile.
 
-Physical database file hashes can differ after a checkpoint or reopen even when the logical graph is identical. Prefer logical parity checks — node/edge counts, stable chunk identifiers, schema/table shape, and sidecar absence — over raw file hashes alone.
+Physical database file hashes can differ after a checkpoint or reopen even when the logical graph is identical. Prefer logical parity checks — node/edge counts, stable chunk identifiers, and schema/table shape — over raw file hashes alone. Require sidecar absence only when the selected backend/version documents that expectation for the tested mode. Do not delete legitimate journal or lock files to make a check pass.
 
 ## Runtime checks
 
@@ -99,17 +105,6 @@ The verifier should check:
 - whether restricted evidence leaked into a lower-trust profile,
 - whether deterministic calculator output was used for math/sizing,
 - whether weak competitive evidence is disclosed rather than hidden.
-
-## Private source mapping
-
-```text
-ipccheng/NX-Shield-RAG-src
-├── ops/launchagents/
-├── rag/hermes-nutanix/config/mcp.yaml
-├── rag/hermes-nutanix/config/gateway_config.json
-├── rag/hermes-nutanix/servers/universal_gateway_mcp.py
-└── hermes/profiles/{sam,nx-shield}/
-```
 
 ## Operational rule
 

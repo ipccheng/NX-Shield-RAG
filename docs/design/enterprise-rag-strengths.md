@@ -1,6 +1,12 @@
-# Enterprise RAG Strengths
+# Enterprise RAG Design Controls
 
-NX-Shield RAG includes the familiar agentic-RAG ideas — planning, source routing, graph context, fallback search, and evidence review — but its main value is the production control plane around retrieval. This page highlights the design strengths that are easy to miss if the system is compared only with generic agentic-RAG tutorials.
+> **Scope:** Independent project design guidance, not a Nutanix-approved implementation. This page does not establish deployed behavior, measured effectiveness, or vendor support. The public repository does not include a runnable service.
+
+## Reading this page
+
+**Agentic RAG** lets an application plan retrieval and call tools rather than perform only one search. **RAG (retrieval-augmented generation)** supplies source material to a language model. **MCP (Model Context Protocol)** connects agents to tools. A **control plane** is the policy and operating logic around those calls; it is not proof of security or answer correctness. **KB** means knowledge-base article; **CVE** is a public vulnerability identifier.
+
+NX-Shield RAG includes the familiar agentic-RAG ideas — planning, source routing, graph context, fallback search, and evidence review — but this page focuses on the proposed policy and operating controls around retrieval. These are design choices to evaluate, not demonstrated advantages over other systems.
 
 ## What makes the design distinctive
 
@@ -8,7 +14,7 @@ NX-Shield RAG includes the familiar agentic-RAG ideas — planning, source routi
 
 The system treats retrieval output as an evidence packet with obligations, confidence, and missing-claim notes. The final answer is expected to satisfy the packet, not freely synthesize from plausible context.
 
-This reduces the common enterprise failure mode where a model retrieves adjacent snippets and then writes a confident but unsupported answer.
+This is intended to reduce the common failure mode where a model retrieves adjacent snippets and then writes a confident but unsupported answer.
 
 ### 2. Source authority is part of ranking
 
@@ -31,7 +37,7 @@ This is essential for a shared MCP service used by multiple agents or personas.
 
 For sizing, usable-capacity, and repeatable arithmetic, calculators run before answer synthesis. RAG provides terminology, assumptions, caveats, and source context, but the numeric result should come from deterministic logic.
 
-This prevents the model from inferring capacity math from similar-looking examples.
+This reduces reliance on the model inferring capacity math from similar-looking examples.
 
 ### 5. Hybrid search is intentionally redundant
 
@@ -106,21 +112,21 @@ The system treats ingestion and graph sync as ongoing operations, not one-time s
 - source-family coverage gaps,
 - and additive backfill checkpoints.
 
-These controls keep graph and vector stores from drifting apart as new Portal docs, KBs, advisories, and internal sources arrive.
+These checks are intended to detect drift between graph and vector stores as new authorized sources arrive; repair still requires scoped validation.
 
-### 11. Endpoint locality is verified
+### 11. Endpoint locality must be verified
 
 In MCP-based systems, it is possible to patch the right code but call the wrong service. NX-Shield RAG treats endpoint locality as part of correctness: the active agent tool, MCP endpoint, tunnel, LaunchAgent, and backend script must be verified before claiming that a runtime change is live.
 
 ### 12. Rebuildability and public/private separation are design goals
 
-The public repo documents architecture, templates, and operational patterns. The private repo and local runtime hold source scripts, data stores, credentials, and environment-specific paths.
+The public repo documents architecture, templates, and operational patterns. Private source control holds implementation scripts and sanitized configuration. Data stores and their backups stay outside Git; credentials come from an approved secret store and must not be committed to either repository.
 
 This separation keeps the design reusable while avoiding accidental disclosure of private data or volatile runtime state.
 
-## Comparison with generic agentic RAG
+## What this notebook emphasizes
 
-Generic agentic-RAG descriptions usually emphasize how an agent can decompose a query, call tools, retrieve iteratively, and use graph or memory. NX-Shield RAG adds the enterprise controls needed to make that safe in technical support and presales contexts:
+An agent can decompose a query, call tools, and retrieve iteratively. This notebook focuses on the evidence and operating controls to evaluate before technical-support or presales use; it does not claim that other RAG designs lack these controls:
 
 - authority-aware ranking,
 - identity-aware retrieval,
@@ -133,7 +139,7 @@ Generic agentic-RAG descriptions usually emphasize how an agent can decompose a 
 
 In short:
 
-> Generic agentic RAG asks, “Can the agent find more context?” NX-Shield RAG asks, “Can the agent prove the answer is safe to say?”
+> Finding more context is only one task. Also ask, “Which evidence and policy checks support delivering this answer?”
 
 ## Design checklist
 

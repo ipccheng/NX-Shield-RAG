@@ -1,5 +1,11 @@
 # AI Governance Alignment
 
+> **Scope:** Independent project design guidance, not a Nutanix-approved implementation. This page does not establish deployed behavior, measured effectiveness, or vendor support. The public repository does not include a runnable service.
+
+## Reading this page
+
+**RAG (retrieval-augmented generation)** supplies retrieved source passages to a language model. An **embedding** is a numeric text representation; a **reranker** scores candidate passages for relevance. Both may send source data to a model service. **Prompt injection** is untrusted text attempting to redirect application behavior. These are project recommendations, not a reproduction of Nutanix policy or a claim of compliance with any standard.
+
 NX-Shield RAG is documented as a design pattern, not as proof that any specific deployment is approved for production or external use. A deployment should be reviewed under the organization’s AI governance process before it is used with sensitive data, made broadly available, or exposed to partners or customers.
 
 This page translates the design into governance-friendly operating requirements without publishing private policy text, internal system details, or confidential data handling specifics.
@@ -103,7 +109,7 @@ Before serving answers, verify:
 
 Use wording like:
 
-> “This design is governance-ready by construction: it separates data classes, applies access policy before answer generation, records evidence provenance, preserves human oversight, and supports monitoring and rollback. A live deployment still requires approval for its application, providers, data classes, and use case.”
+> “This design proposes controls for data classification, retrieval-time access policy, evidence provenance, human oversight, monitoring, and rollback. Their implementation and effectiveness must be verified. A live deployment still requires approval for its application, providers, data classes, and use case.”
 
 Avoid wording like:
 

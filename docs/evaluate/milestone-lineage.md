@@ -1,28 +1,34 @@
 # Milestone Lineage
 
-NX-Shield RAG evolved through several design lessons. This page keeps the public lessons without exposing private operational detail.
+> **Scope:** Independent project design guidance, not a Nutanix-approved implementation. This page does not establish deployed behavior, measured effectiveness, or vendor support. The public repository does not include a runnable service.
+
+## Reading this page
+
+**Reranking** reorders retrieved passages. An **evidence ledger** records claim support and gaps. **Shadow** means evaluating without changing served answers; a **canary** is a regression test. **MCP (Model Context Protocol)** connects agents and tools. A **soak period** observes a change before old recovery artifacts are retired.
+
+This page organizes design lessons, not a release history or independently reproducible record of deployment milestones.
 
 ## Key lessons
 
-### Retrieval architecture improved, but answer quality needed its own layer
+### Retrieval and answer quality need separate checks
 
-Early work focused on search channels, routing, and reranking. Later work showed that good retrieval can still produce wrong answers unless the final synthesis is constrained by an Evidence Ledger and checked by answer-verifier gates.
+Relevant retrieval can still lead to an incorrect answer. An evidence ledger and answer-verifier gates are proposed checks on final synthesis, not guarantees of correctness.
 
-### Graph boost is useful but insufficient
+### Graph context needs evidence and evaluation
 
-Ladybug graph context improves structural recall and explanation. It does not replace source evidence. The graph is treated as advisory context.
+Graph context can aid relationship-based retrieval and explanation; its benefit must be measured. It does not replace source evidence. The graph is treated as advisory context.
 
 The safe rollout pattern is graph-shadow first: compare baseline evidence with graph-assisted candidates in reports before changing served ranking or answer generation.
 
-### Unified corpus beats parallel legacy stores
+### Why use a unified corpus
 
-A single active search path with explicit lineage metadata is easier to operate than multiple hidden fallbacks. Old stores should remain rollback archives until soak completes.
+A single active search contract can reduce routing ambiguity compared with hidden fallback stores. Evaluate that trade-off for the deployment; retain compatible old stores as rollback archives until the defined observation and recovery gates pass.
 
-### Calculator-first changed sizing reliability
+### Calculator-first sizing
 
 Storage sizing and similar math questions should use deterministic calculators first. RAG provides definitions, assumptions, and caveats.
 
-A later evaluation milestone made this testable by injecting calculator output as report-only evidence for verifier scoring. This proves that math answers are tool-supported without mutating the corpus or graph.
+Test this by injecting calculator output as report-only evidence for verifier scoring. This checks whether the tested answers use the supplied calculations without changing the corpus or graph.
 
 ### Answer verification became a separate gate
 

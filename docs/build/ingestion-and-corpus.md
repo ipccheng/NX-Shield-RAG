@@ -1,5 +1,11 @@
 # Ingestion and Corpus Build
 
+> **Scope:** Independent project design guidance, not a Nutanix-approved implementation. This page does not establish deployed behavior, measured effectiveness, or vendor support. The public repository does not include a runnable service.
+
+## Reading this page
+
+**Ingestion** converts authorized source documents into a searchable **corpus** (collection). A **chunk** is a passage stored as one retrieval unit. An **embedding** represents its text numerically; **FTS** means full-text search. **Provenance** connects a chunk to its origin. A **canary** is a representative regression test; **promotion** switches serving to a validated candidate. LanceDB and Ladybug are the reference vector/text and graph components, not bundled services.
+
 The ingestion pipeline should produce a searchable, policy-aware corpus — not just chunks.
 
 ## Target output
@@ -80,7 +86,7 @@ A mature RAG store usually needs:
 - scalar indexes for source family/access/product/version,
 - stable identity fields for deduplication.
 
-The current unified v4 LanceDB contract uses one embedding vector column, one lexical `search_text` column, and scalar indexes over identity, source, access, version, and lineage fields. The public-safe schema is documented in [LanceDB schema](../design/lancedb-schema.md).
+The reference LanceDB contract uses one embedding vector column, one lexical `search_text` column, and scalar indexes over identity, source, access, version, and lineage fields. The public-safe schema is documented in [LanceDB schema](../design/lancedb-schema.md).
 
 Benchmark before adding indexes. Index churn without measured need can complicate rebuilds.
 
@@ -99,17 +105,3 @@ Treat a corpus update as a candidate promotion, not as an in-place write to the 
 9. roll back automatically if any required gate fails.
 
 Rebuilding every index can change approximate-nearest-neighbor ordering even when row content is unchanged. Prefer an incremental/index-preserving candidate when it passes both new-content retrieval and frozen preservation canaries. Keep historical rows unless an independently reviewed deletion policy explicitly authorizes physical removal.
-
-## Private source mapping
-
-Private source files that correspond to ingestion:
-
-```text
-ipccheng/NX-Shield-RAG-src
-├── rag/hermes-nutanix/ingestion/
-├── rag/hermes-nutanix/ingestion/openclaw_pipeline/
-├── rag/hermes-nutanix/ingestion/tagger_v3.py
-└── rag/hermes-nutanix/runtime/ladybug-graph-probe/scripts/ladybug_graph_probe.py
-```
-
-These paths are implementation references, not public dependencies.

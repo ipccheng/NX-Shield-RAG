@@ -1,10 +1,16 @@
 # Metadata and Corpus Design
 
+> **Scope:** Independent project design guidance, not a Nutanix-approved implementation. This page does not establish deployed behavior, measured effectiveness, or vendor support. The public repository does not include a runnable service.
+
+## Reading this page
+
+A **corpus** is the document collection. **Metadata** describes each passage, including origin and permissions. **Lineage** records transformations; **provenance** links evidence back to its source. **Deduplication** reconciles repeated evidence identities. A **canary** is a representative regression test, and a **soak period** is observation after a change before removing rollback artifacts.
+
 Metadata is not decoration. In an enterprise RAG system, metadata is the control plane for retrieval quality and safety.
 
 ## Core fields to model
 
-The active unified v4 corpus uses these field groups. See [LanceDB schema](lancedb-schema.md) for the full public-safe schema contract.
+The reference corpus model uses these field groups. See [LanceDB schema](lancedb-schema.md) for the full public-safe schema contract.
 
 A robust technical-support corpus should include fields like:
 
@@ -44,7 +50,7 @@ This pattern satisfies explicit source requests without treating every source fa
 
 ## Unified corpus concept
 
-The implementation uses a unified-corpus pattern: keep the active query path simple while preserving lineage from multiple generations of content. The active v4 shape combines native/current evidence and transformed legacy rows in one table contract rather than forcing the runtime to choose between parallel stores.
+The design proposes a unified-corpus pattern: keep the active query path simple while preserving lineage from multiple generations of content. The reference shape combines native/current evidence and transformed legacy rows in one table contract rather than forcing the runtime to choose between parallel stores.
 
 A row should answer:
 

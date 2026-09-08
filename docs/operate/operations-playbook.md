@@ -1,5 +1,11 @@
 # Operations Playbook
 
+> **Scope:** Independent project design guidance, not a Nutanix-approved implementation. This page does not establish deployed behavior, measured effectiveness, or vendor support. The public repository does not include a runnable service.
+
+## Reading this page
+
+**MCP (Model Context Protocol)** connects an agent to tools. A **gateway** bridges user/agent requests to services. A **canary** is a representative regression test. **Parity** means agreement on specified logical data and policy, not necessarily identical database bytes. **Quiesce** means stop writes or serving as required for a consistent change. A **sidecar** here is an auxiliary database journal or lock file, not a separate application service.
+
 This playbook is intentionally public-safe and implementation-neutral.
 
 ## Before changing runtime behavior

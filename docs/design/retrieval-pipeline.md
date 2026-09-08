@@ -1,10 +1,16 @@
 # Retrieval Pipeline
 
+> **Scope:** Independent project design guidance, not a Nutanix-approved implementation. This page does not establish deployed behavior, measured effectiveness, or vendor support. The public repository does not include a runnable service.
+
+## Reading this page
+
+**LLM** means large language model. **Semantic/vector search** finds similar meanings using numeric text representations; **lexical/FTS search** matches terms. **RRF (Reciprocal Rank Fusion)** combines result ranks instead of comparing incompatible raw scores. A **reranker** scores query/passage relevance after initial retrieval. **KB** means knowledge base; **RF/FT** refer to replication-factor and fault-tolerance assumptions. **HA/DR** means high availability/disaster recovery. **MCP (Model Context Protocol)** carries tool requests; it does not replace caller authorization.
+
 The retrieval pipeline is designed to answer hard technical questions where the right answer may require multiple evidence families.
 
 ## Query flow
 
-The current v4 path keeps the latency-sensitive retrieval logic deterministic where possible. Query-time LLM planning is not required for obvious exact-KB, limit/fact, or explicit comparison queries. Those classes use bounded route construction and metadata-aware ranking instead.
+The reference query path keeps the latency-sensitive retrieval logic deterministic where possible. Query-time LLM planning is not required for obvious exact-KB, limit/fact, or explicit comparison queries. Those classes use bounded route construction and metadata-aware ranking instead.
 
 ```mermaid
 sequenceDiagram
@@ -44,7 +50,7 @@ Gateway or agent wrappers may add conversation context around a user question. T
 
 Best for semantic recall: paraphrases, conceptual questions, and product descriptions.
 
-Failure mode: can retrieve plausible-but-wrong chunks when terminology overlaps. The embedding call itself is also an operational dependency: provider responses should be shape-validated before indexing into `data[0].embedding`, retried only within a bounded window, and failed closed with a redacted actionable error when the response is an error object or malformed payload.
+Failure mode: can retrieve plausible-but-wrong chunks when terminology overlaps. The embedding call itself is also an operational dependency: model-service responses should be validated for expected structure, vector dimension, and finite numeric contents before use, retried only within a bounded window, and failed closed with a redacted actionable error when the response is an error object or malformed payload.
 
 ### 2. Full-text search
 
@@ -120,6 +126,8 @@ The Evidence Ledger and answer verifier should then distinguish:
 
 ## Output contract
 
+The packet below is illustrative, not actual retrieved evidence or a hardware-support statement. Replace its supported-claim placeholders only after checking authorized sources.
+
 The retrieval layer should return a packet like this:
 
 ```text
@@ -131,8 +139,8 @@ answer_obligations:
   - operational risk/caveats
 evidence_ledger:
   supported:
-    - Hardware guide mentions supported NIC family.
-    - Network guide describes host/CVM uplink reconfiguration.
+    - <Verified hardware claim with source identity and section>
+    - <Verified networking claim with source identity and section>
   weak_or_missing:
     - Exact customer part replacement path not found.
 answer_rule:

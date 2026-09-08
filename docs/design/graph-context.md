@@ -1,5 +1,11 @@
 # Graph Context with Ladybug
 
+> **Scope:** Independent project design guidance, not a Nutanix-approved implementation. This page does not establish deployed behavior, measured effectiveness, or vendor support. The public repository does not include a runnable service.
+
+## Reading this page
+
+A **graph** stores entities as nodes and relationships as edges. Here, Ladybug names the reference graph component; LanceDB names the searchable text/vector store. **Recall** measures how much relevant evidence retrieval finds. **Top-k** means the first k results. **Shadow** runs an experiment without changing delivered answers; a **canary** is a representative regression test. A **bounded boost** limits how much a signal may change ranking.
+
 NX-Shield uses graph context as a retrieval signal, not as a truth oracle.
 
 ## What belongs in the graph
@@ -62,7 +68,7 @@ Graph libraries and vector-store runtimes do not always coexist safely inside on
 - isolate driver-specific imports if mixed native modules can conflict,
 - make graph candidate ordering deterministic before comparing top-k results,
 - preserve a rollback path to the previous graph backend or to graph-disabled retrieval,
-- verify that no write-ahead, shadow, or lock sidecars appear during read-only serving canaries.
+- check read-only behavior against the selected backend/version contract; require sidecar absence only when that contract requires it, and never delete recovery or lock files merely to satisfy a canary.
 
 This pattern lets a team evaluate a new graph backend without treating the migration as a data-store cutover. The backend can be active as a candidate source while ranking remains canary or guarded-live.
 

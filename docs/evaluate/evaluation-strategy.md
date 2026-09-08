@@ -1,12 +1,18 @@
 # Evaluation Strategy
 
+> **Scope:** Independent project design guidance, not a Nutanix-approved implementation. This page does not establish deployed behavior, measured effectiveness, or vendor support. The public repository does not include a runnable service.
+
+## Reading this page
+
+**Top-k** means the first k retrieved results. A **harness** automates test cases; a **canary** is a small regression test. **Shadow/report-only** evaluation records results without changing delivery. A **false positive** incorrectly rejects a supported answer. **MCP (Model Context Protocol)** connects tools to agents. **BOM** means bill of materials; **HCL** means hardware compatibility list; **HA/DR** means high availability/disaster recovery. **RF** means replication factor. **RCA** means root-cause analysis.
+
 A RAG system should be evaluated at three levels:
 
 1. retrieval quality,
 2. evidence packet quality,
 3. final answer quality.
 
-Top-k retrieval alone is not enough. Evaluation should prove that the system can retrieve the right evidence, expose weak coverage, and prevent unsupported final answers.
+Top-k retrieval alone is not enough. Evaluation should measure whether the system retrieves the right evidence, exposes weak coverage, and rejects unsupported answers on the tested cases; it cannot prove universal correctness.
 
 ## Retrieval checks
 
@@ -50,10 +56,10 @@ Reports should separate blocking `restricted_evidence_findings` from non-blockin
 Measure the answer the user actually sees:
 
 - uses RAG first for domain questions,
-- cites or names source families appropriately,
+- cites stable sources and sections, or current-turn tool-result references, for claims; source-family labels are supplemental metadata, not sufficient citations,
 - does not overstate weak evidence,
 - does not mix public and internal evidence under restricted identities,
-- gives deterministic numbers only from tools or explicitly stated assumptions,
+- gives calculated numbers only from tool execution with explicitly stated inputs, units, and assumptions,
 - rewrites or fails closed when evidence does not support the requested answer.
 
 ## Report-only harness pattern
@@ -144,7 +150,7 @@ The safer pattern is:
 4. let RAG provide definitions, caveats, and source-backed assumptions,
 5. verify that the final answer uses the tool output rather than inventing numbers.
 
-Calculator evidence can be tested in report-only mode by appending an in-memory evidence row to the verifier input. This proves answer quality without writing to the vector store, graph store, or serving path.
+Calculator evidence can be tested in report-only mode by appending an in-memory evidence row to the verifier input. This tests claim support for the supplied cases without writing to the vector store, graph store, or serving path.
 
 ## Hardware BOM and replacement-sizing checks
 
@@ -235,8 +241,16 @@ Promotion should remain reversible through config, not data mutation. If the gra
 
 ## Milestone reports
 
-The private source repo stores historical K-series, canary, and eval-harness reports. Public docs should summarize patterns, not expose local-only operational data.
+The private source repo stores historical change, canary, and evaluation reports. Public docs should summarize patterns, not expose local-only operational data.
 
 Public principle:
 
 > Report design lessons and evaluation categories publicly. Keep raw private paths, private query logs, row counts, hostnames, and sensitive operational details out of public docs.
+
+## Reproducible reporting
+
+Before running a comparison, freeze the test queries, relevance labels, baseline/candidate revisions, corpus and schema identities, model versions, caller policies, fallback settings, and latency boundary. Record expected refusals as test successes when policy requires refusal. Keep dependency failures separate from retrieval misses.
+
+Report sample size and per-class failures alongside aggregate metrics. Define Hit@k (queries with a relevant result), Recall@k (relevant items retrieved), and MRR (mean reciprocal rank of the first relevant item) before comparing runs. Record whether latency covers retrieval only or the entire answer, including retries and external calls. Include unauthorized duplicates, missing metadata, rollback paths, and prompt-injection cases, not only ordinary successful questions.
+
+No executable harness or public benchmark dataset is shipped here. Implementers must supply and run their own authorized tests; these checklists are not test results.

@@ -1,6 +1,12 @@
 # Evidence-Ledger Answering
 
-The Evidence Ledger is the most important design pattern in NX-Shield RAG.
+> **Scope:** Independent project design guidance, not a Nutanix-approved implementation. This page does not establish deployed behavior, measured effectiveness, or vendor support. The public repository does not include a runnable service.
+
+## Reading this page
+
+An **obligation** is a question the answer must address. A **verifier** checks a draft against its evidence; it can make mistakes and does not certify vendor support. **Fail closed** means withholding normal delivery when a required evidence or policy check fails. **NIC** means network interface card; **RF** means replication factor, a data-copy assumption for sizing. Use the [ledger template](../../templates/evidence-ledger-template.yaml) and [query examples](../../examples/query-obligations.md).
+
+An evidence ledger records which claims the available sources support and which questions remain unanswered.
 
 It turns retrieval output into an explicit answer contract.
 
@@ -25,6 +31,8 @@ Before final answer generation, compile an evidence ledger with four sections:
 
 ## Example
 
+This is a fictional structure, not an excerpt from vendor documentation or evidence that a hardware change is supported. Replace the placeholders with verified sources before use.
+
 ```yaml
 answer_obligations:
   - identify whether the replacement path is documented
@@ -32,10 +40,10 @@ answer_obligations:
   - call out production-impacting risks
 
 supported_claims:
-  - source: Hardware Admin Guide
-    claim: NIC replacement requires validating host networking after physical change.
-  - source: Prism networking docs
-    claim: Uplink/vSwitch mappings may need to be reviewed after NIC changes.
+  - source: <verified hardware source and section>
+    claim: <network validation requirement directly supported by that source>
+  - source: <verified networking source and section>
+    claim: <mapping review requirement directly supported by that source>
 
 weak_or_missing_claims:
   - exact Broadcom-to-Intel replacement certification evidence was not found
@@ -105,13 +113,8 @@ The ledger creates a boundary between retrieval and writing. It makes the model 
 - Are we using deterministic tools where needed?
 - Did the verifier accept the answer or require a rewrite?
 
-## Implementation notes
+## Traceability and limits
 
-In the private source bundle, this pattern maps mainly to the active RAG search, verifier, and answer-formatting paths:
+For each claim, record a stable source identity, section or tool-result locator, applicable product/source version, and evidence scope. For calculations, include inputs, units, formula/tool version, and assumptions. A source-family label alone is not a checkable citation.
 
-```text
-ipccheng/NX-Shield-RAG-src
-└── rag/hermes-nutanix/
-```
-
-The exact implementation can change, but the public design contract should remain stable: **the final answer must be traceable to evidence and rules.**
+Bind the ledger to the current question and authorized tool results. Missing evidence means “not established by this evidence,” not “the vendor does not support it.” A verifier can miss errors or reject valid claims; measure both failures and require human review for high-impact decisions.

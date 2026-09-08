@@ -1,8 +1,14 @@
 # Architecture Overview
 
+> **Scope:** Independent project design guidance, not a Nutanix-approved implementation. This page does not establish deployed behavior, measured effectiveness, or vendor support. The public repository does not include a runnable service.
+
+## Reading this page
+
+**RAG (retrieval-augmented generation)** gives a language model retrieved source material before it drafts an answer. A **corpus** is the document collection; a **chunk** is a retrievable passage. An **embedding** represents text as numbers for similarity search. **FTS (full-text search)** matches words; **scalar filters** restrict metadata values. **RRF (Reciprocal Rank Fusion)** combines ranked result lists. A **reranker** reorders a small candidate set for relevance. **MCP (Model Context Protocol)** is the agent-to-tool interface, not an access-control policy. A **canary** is a small regression test; **lineage** records how content was derived.
+
 NX-Shield RAG is organized around one operational goal:
 
-> Turn a user question into a small, source-traceable evidence packet that an agent can safely answer from.
+> Turn a user question into a small, source-traceable evidence packet that an agent can use to draft a checkable answer.
 
 The system is not a single retriever. It is a set of cooperating layers:
 
@@ -91,7 +97,7 @@ The final answer should cover those obligations only when evidence supports them
 
 ### LanceDB-centered corpus
 
-LanceDB is the center because it holds the searchable corpus and metadata used by vector, lexical, scalar, and source-policy filters. The active setup uses a unified v4 corpus concept: native/current rows plus transformed legacy evidence with lineage metadata. The public-safe table contract is documented in [LanceDB schema](lancedb-schema.md).
+LanceDB is the center because it holds the searchable corpus and metadata used by vector, lexical, scalar, and source-policy filters. The reference schema uses a unified corpus concept: native/current rows plus transformed legacy evidence with lineage metadata. The public-safe table contract is documented in [LanceDB schema](lancedb-schema.md).
 
 The important implementation detail is not the live row count; it is the contract: every row must carry source authority, access policy, product/version metadata, stable identity, search text, an embedding vector, and lineage. This lets the runtime prefer official Portal refresh rows, preserve exact KB lookups, route comparison queries to competitive collateral when appropriate, and still keep older migrated evidence auditable.
 
@@ -114,7 +120,7 @@ The ledger is the handoff between retrieval and answer generation. It should mak
 ## Data/control separation
 
 - **Public design docs** live here.
-- **Private source scripts** live in `ipccheng/NX-Shield-RAG-src`.
+- **Implementation source** is maintained separately under access control and is not distributed here.
 - **Large RAG data stores** live in backups, not Git.
 - **Secrets** live only in a credential vault or local env files.
 - **Governance records** such as approvals, risk assessments, data-class decisions, and provider reviews live in internal systems, not in this public repo.

@@ -1,199 +1,58 @@
-# RAG Improvements Release Note
+# RAG Design Improvement Summary
 
-This note summarizes the current public design improvements in NX-Shield RAG. It is intentionally implementation-neutral: it avoids live hostnames, private paths, row counts, credentials, internal tickets, and operational secrets.
+This page summarizes proposed retrieval and operating controls. The filename is retained for existing links; this is **not a software release note, deployment attestation, or benchmark report**. No public executable implementation or reproducible performance result accompanies these claims.
 
-## Executive summary
+NX-Shield RAG is an independent project, not a Nutanix-approved implementation. Deployment owners must separately validate technical behavior, source rights, provider data flows, organizational approval, and any product support or licensing claims.
 
-NX-Shield RAG has moved from a basic document-search pattern toward a production-controlled evidence system:
+## Terms used here
 
-```text
-vector search demo
-→ hybrid evidence retrieval
-→ identity-aware, verifier-controlled, graph-assisted RAG platform
-```
+**RAG (retrieval-augmented generation)** gives a language model retrieved sources before it drafts an answer. An **embedding** represents text numerically for similarity search. **Reranking** reorders candidate passages for relevance. A **verifier** compares draft claims with available evidence; it is not a guarantee of truth. **MCP (Model Context Protocol)** connects agents and tools. **Shadow** runs a proposed change without altering delivery; a **canary** is a representative regression test. **Promotion** moves a validated candidate into serving, and **rollback** restores the prior compatible state.
 
-The design goal is not just to retrieve relevant snippets. The goal is to produce answers that are source-grounded, access-policy aware, measurable, and governable across multiple agent profiles. A live deployment still needs approval for the application boundary, model/provider path, data classes, and use case before it is treated as production-ready or external-facing.
+## Controls and the failure modes they target
 
-## What improved
+| Design area | Proposed behavior | What must be tested |
+| --- | --- | --- |
+| Hybrid retrieval | Combine vector search, full-text search, exact identifiers, metadata filters, and bounded graph hints | Exact identifiers and version-sensitive evidence remain visible; extra channels do not bypass authorization |
+| Query hygiene | Separate the current question from previous answers and wrapper text; use search-only aliases | Clean and context-wrapped queries preserve intent; explicit identifiers are not silently corrected |
+| Comparison routing | Construct a bounded set of side-specific routes rather than requiring a model planner for every query | Both sides receive evidence coverage; missing competitor evidence is disclosed |
+| Source authority | Prefer current, applicable official sources for operational claims; use implementation sources for implementation questions | Bounded ranking boosts do not displace more relevant or exact evidence |
+| Explicit source requests | Surface requested Nutanix Bible evidence without replacing current operational authority | Exact-ID lanes bypass broad source promotion; ordering changes retain provenance |
+| Graph context | Use Ladybug as the reference relationship component, linked to evidence in the searchable corpus | Graph relationships remain hints, not independent proof; backend and ranking changes have separate gates |
+| Answer verification | Use `PASS`, `PASS_WITH_WARNINGS`, `REWRITE_REQUIRED`, or `FAIL_CLOSED` to control draft delivery | Unsupported claims, overstatements, and missing caveats are caught without excessive rejection of valid answers |
+| Model dependencies | Validate response structure, finite vector values, model/dimension compatibility, and bounded retries | Dependency failures are reported as dependency failures, not confused with missing corpus evidence |
+| Identity boundaries | Bind each caller to explicit source permissions across retrieval, graph expansion, fallbacks, and delivery | Unknown identities fail closed; an internal entitlement never leaks into a public profile |
+| Operational diagnosis | Separate service, client/session, gateway, store, graph, model, and verifier failures | A stale client or malformed model response does not trigger unnecessary re-ingestion or store mutation |
+| Corpus lifecycle | Capture source identity, hierarchy, artifacts, extraction quality, and provenance before candidate promotion | New-content retrieval and old-query preservation pass; source/vector/graph state and rollback artifacts are consistent |
+| Hardware sizing | Separate inventory, computed resource totals, vendor specifications, and design validation | Raw is not mistaken for usable capacity; calculated capacity is not treated as an orderable or supported configuration |
 
-### 1. Retrieval is more robust and deterministic
+These controls are intended to address failure modes, not establish measured improvement. See the [retrieval pipeline](../design/retrieval-pipeline.md), [evidence ledger](../design/evidence-ledger.md), and [ingestion model](../build/ingestion-and-corpus.md) for details.
 
-The query path is designed around multiple complementary retrieval channels instead of a single vector lookup:
+## Evaluation evidence required before claiming improvement
 
-- hybrid vector + full-text retrieval,
-- exact and deterministic lookup lanes,
-- metadata and access-policy filters,
-- source-authority ranking,
-- bounded graph signal,
-- calculator-first paths for sizing and arithmetic questions.
+Record the baseline and candidate revisions, compatible schemas/models, frozen test set, identities, fallback settings, and measurement boundary. Compare at least:
 
-This improves exact-ID, compatibility, security advisory, KB, Field Advisory, and supportability queries where vector-only retrieval can miss important source identity signals.
+- **Hit@5:** the fraction of queries with at least one labeled relevant result among the first five.
+- **Recall@5:** the fraction of labeled relevant items found among the first five, with a documented aggregation method.
+- **MRR (mean reciprocal rank):** a summary of how early the first relevant result appears.
+- Source authority, freshness, exact-identifier preservation, and comparison-side coverage.
+- Unauthorized-evidence findings, including duplicate-policy conflicts and fallback paths.
+- Verifier accept/rewrite/block results, false positives, and missed unsupported claims.
+- Local retrieval and end-to-end latency separately, including model calls and fallbacks when enabled.
 
-### 2. Gateway query hygiene is stronger
+Metrics are only as reliable as the labeled cases and measurement setup. A small smoke test does not establish production accuracy, a service-level objective, or safety for a new user population. Follow the [evaluation strategy](evaluation-strategy.md).
 
-The current design separates the current user question from wrapped conversation context before retrieval. This reduces failures where previous-answer text or gateway wrapper text pollutes the actual search query.
+## Gated rollout, not implied deployment status
 
-The design also supports normalization for common typo, alias, and intent patterns, such as product acronyms, version formatting, and Prism Central compatibility language.
+1. Run report-only diagnostics on a frozen candidate.
+2. Compare shadow results with the baseline, including source review of each first-result change.
+3. Permit guarded influence only with bounded ranking changes, identity checks, and delivery enforcement appropriate to the evaluated scope.
+4. Promote only the exact tested source/configuration/store set, with a compatible rollback set.
+5. Verify fresh direct and application-level requests after cutover; roll back if a required gate fails.
 
-### 3. Comparison queries are handled more deliberately
+Keep graph ranking, graph repair, corpus pruning, verifier enforcement expansion, historical-query learning, and new intent-specific lanes separately gated. Success in one area does not authorize another.
 
-Comparison questions use bounded deterministic planning rather than a default always-on query-time planner. The design can decompose explicit comparison prompts into side-specific retrieval obligations and make weak evidence visible when one side has thinner coverage.
+For multi-host deployments, compare logical store content and policy, not raw file hashes alone. Incremental index preservation can limit unrelated ranking changes, but still needs new-content and preservation tests. See [operations](../operate/operations-playbook.md).
 
-This improves competitor and product comparisons by reducing one-sided answers and making coverage gaps explicit instead of allowing the answer model to fill gaps from prior knowledge.
+## Diagram and next reading
 
-### 4. Source authority is part of retrieval logic
-
-The system treats source authority as a retrieval and ranking concern, not just an answer-formatting concern.
-
-The intended ranking posture is:
-
-- prefer official Nutanix Portal, KB, release note, Field Advisory, and product documentation evidence for operational claims,
-- use developer and GitHub-style sources primarily for API, automation, IaC, and implementation questions,
-- treat community, web, and lower-authority sources as fallback or supporting context unless the query class explicitly calls for them.
-
-This reduces the risk of lower-authority snippets outranking official sources for operational answers.
-
-### 5. Explicit source requests preserve operational authority
-
-When a user explicitly requests the Nutanix Bible, relevant Bible evidence can be promoted into the visible evidence set. For operational procedures, current Portal and KB evidence retains precedence, while Bible material contributes architecture and design depth.
-
-Exact-ID lookups bypass broad source-family promotion, and promotion provenance remains available to evaluation and audit paths.
-
-### 6. Ladybug is the active graph DB
-
-The active graph posture has been updated:
-
-- **Ladybug** is the graph DB on the active query path.
-- Graph output remains a bounded ranking and explanation signal, not a source of truth by itself.
-
-This makes graph migration safer: the graph can help retrieval ranking and explain related concepts, but answer claims still require source-backed evidence.
-
-### 7. Answer verification is a first-class control layer
-
-The design includes an answer-verification posture with outcomes such as:
-
-- `PASS`,
-- `PASS_WITH_WARNINGS`,
-- `REWRITE_REQUIRED`,
-- `FAIL_CLOSED`.
-
-The verifier is intended to catch unsupported claims, over-strong absolutes, missing weak-evidence disclosures, and cases where the answer deflects even though actionable evidence exists.
-
-### 8. Provider failures fail closed
-
-Embedding and reranking services are treated as dependencies that can fail independently from corpus quality.
-
-The design now calls out provider response hardening:
-
-- validate response shape,
-- validate vector contents,
-- retry boundedly where appropriate,
-- fail closed with a clear dependency error instead of misclassifying the issue as a retrieval or data-corruption problem.
-
-### 9. Evaluation and canaries guide promotion
-
-Promotion decisions should be backed by report-only evaluations and canaries instead of intuition or one-off examples.
-
-Useful tracked dimensions include:
-
-- Hit@5 / Recall@5,
-- MRR,
-- citation authority,
-- stale-source avoidance,
-- comparison side coverage,
-- fallback rate,
-- latency,
-- verifier pass/rewrite/fail outcomes,
-- identity-boundary behavior.
-
-Graph ranking, verifier enforcement, and broad corpus changes should move through shadow, canary, guarded-live, and rollback-aware stages.
-
-### 10. Identity and access boundaries are explicit
-
-The design supports multiple agent identities and access policies, including internal, customer-visible, partner-facing, and profile-specific retrieval boundaries.
-
-Access policy is treated as retrieval logic. Public, partner, and internal corpora must not be separated only at final answer generation time.
-
-The production gate preserves identity semantics: retrieval-time forbidden-source matches block every identity; restricted evidence under public, partner, or unknown identities is blocking; explicitly allowlisted internal telemetry is reported separately rather than discarded. Missing identities are handled conservatively as unknown.
-
-### 11. Operational reliability is part of the architecture
-
-The design distinguishes among several failure layers:
-
-- RAG service health,
-- MCP client/session health,
-- gateway wrapper behavior,
-- LanceDB retrieval behavior,
-- graph backend behavior,
-- provider dependency behavior,
-- answer-verifier behavior.
-
-This reduces unnecessary store mutation, re-ingestion, or service restarts when the real issue is a stale client, malformed provider response, query wrapper problem, or identity-boundary mismatch.
-
-### 12. Source capture and corpus promotion are provenance-controlled
-
-The ingestion design now distinguishes source inventory, canonical identity, structured generated content, published artifacts, extracted sections/pages, and final chunk provenance. Complete current-source coverage is verified by identity and body fingerprints rather than inferred from a matching title or incidental paragraph.
-
-Corpus updates are promoted through isolated candidates with preservation canaries, paired-host parity, frozen rollback bindings, scoped service cutover, and fresh live checks. Incremental/index-preserving candidates are preferred when full index reconstruction changes unrelated approximate-ranking behavior.
-
-### 13. Hardware BOM answers separate arithmetic from supportability
-
-Sizing answers now explicitly separate customer inventory, deterministic resource arithmetic, vendor platform specifications, and final design/supportability validation. Raw capacity is not presented as usable capacity; calculator-valid capacity buckets are not treated as exact orderable SKUs; and N+1, media endurance, licensing, HCL/firmware, performance, rack, power, network, and migration checks remain visible before a preliminary BOM is called validated.
-
-## Updated public diagram
-
-The public query-path diagram has been refreshed to reflect the current posture:
-
-- Ladybug graph DB,
-- LanceDB hybrid retrieval as the evidence source of truth,
-- graph as bounded ranking signal,
-- current-question-focused MCP bridge,
-- embedding response hardening,
-- answer-verifier rewrite/fail-closed loop,
-- external fallback only after local evidence gaps.
-
-See: [`diagrams/sample-query-path-vcf-aos.png`](../../diagrams/sample-query-path-vcf-aos.png)
-
-## Practical impact
-
-These improvements should most help with:
-
-- multi-document synthesis,
-- product and competitor comparisons,
-- CVE / security advisory / Field Advisory lookup,
-- exact KB and Portal article lookup,
-- source freshness and source-authority handling,
-- partner-facing answers that need explicit uncertainty,
-- storage or sizing answers where deterministic calculators should lead,
-- graph-assisted discovery without graph-driven hallucination.
-
-The gains are expected to be less dramatic for simple factual queries that were already answered correctly by existing local evidence.
-
-## What remains intentionally gated
-
-The following areas should remain gated by evaluation, rollback planning, and explicit operating decisions:
-
-- broader graph-ranking promotion,
-- active graph orphan repair,
-- broad corpus pruning,
-- verifier enforcement expansion,
-- query-plan memory or learning from historical outcomes,
-- additional intent-specific lanes for hardware, licensing, CVE, architecture, and competitive analysis.
-
-The safe direction is to continue using report-only audits, scoped canaries, and explicit promotion gates before mutating stores or changing live answer behavior.
-
-## Bottom line
-
-NX-Shield RAG is no longer documented as a generic "search documents and answer" system. The current public design presents it as an evidence-control architecture:
-
-```text
-local-first hybrid retrieval
-+ source authority
-+ identity-aware access control
-+ bounded graph signal
-+ calculator-first deterministic tools
-+ verifier-controlled answer delivery
-+ evaluation-gated operations
-```
-
-That combination makes the system a stronger candidate architecture for technical support, presales, and partner-facing use cases where unsupported claims are operationally risky. It does not, by itself, make any specific deployment approved for those use cases; approval depends on the organization’s AI governance process, data classification, provider path, and operating controls.
+The [query-path illustration](../../diagrams/sample-query-path-vcf-aos.png) is a conceptual aid, not proof of active components or verified behavior. Use [architecture](../design/architecture.md) for component responsibilities and [governance](../design/ai-governance-alignment.md) for approval boundaries.

@@ -1,5 +1,11 @@
 # Security and Access Policy
 
+> **Scope:** Independent project design guidance, not a Nutanix-approved implementation. This page does not establish deployed behavior, measured effectiveness, or vendor support. The public repository does not include a runnable service.
+
+## Reading this page
+
+**RAG (retrieval-augmented generation)** passes retrieved passages to a language model. **FTS** means full-text search. An **identity** is the authenticated caller or service principal; a **profile** is configuration bound to that identity, not a user-supplied permission claim. **Fail closed** means denying access when required identity or policy information is missing. **MCP (Model Context Protocol)** is a tool interface, not an authorization system.
+
 RAG access control must happen before and during retrieval, not only in the final answer prompt.
 
 ## Threat model
@@ -35,3 +41,16 @@ The same corpus can serve different agents if each MCP service/profile has a cle
 ## Repository policy
 
 This public repo contains design docs only. Source scripts live in the private source repo. Credentials and data stores live outside Git. Governance records, approval decisions, risk assessments, and provider-review artifacts should stay in the appropriate internal systems and should not be copied into this public repository.
+
+## Enforcement boundaries to test
+
+Treat retrieved documents, graph labels, tool output, and conversation history as untrusted data, never as instructions that may change permissions. A prompt-injection detector is an additional signal, not the authorization boundary.
+
+- Authenticate the caller and bind a server-controlled identity; do not accept an asserted profile name as permission.
+- Reconcile duplicate evidence with conflicting source or access metadata conservatively before source filtering, ranking, or deduplication can hide the restrictive copy.
+- Apply policy to context expansion, graph neighbors, exact lookup, fallback results, and any evidence appended by a gateway. Recheck before serialization and model submission.
+- Scope caches, logs, and retained conversation context to authorized identities and retention policy; embeddings and graph metadata also require data classification.
+- Record unauthorized retrieval as a blocker even when the final answer omits it. Do not expose restricted titles or source existence in a denial message.
+- Test unknown identities, missing policy fields, conflicting duplicates in both input orders, and rollback schemas through the actual application path.
+
+See [evaluation](../evaluate/evaluation-strategy.md) and [governance](ai-governance-alignment.md). These are required test objectives, not claims that the public repository implements the controls.

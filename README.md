@@ -1,211 +1,92 @@
 # NX-Shield RAG
 
-**A field-tested design for building a trustworthy enterprise RAG system — not just a vector search demo.**
+**How to build a technical assistant that finds relevant documents, respects access rules, and explains what its evidence does—and does not—support.**
 
-NX-Shield RAG is a public design notebook for a Nutanix-focused retrieval-augmented generation system. The implementation is private, but the architecture is documented here so other teams can copy the patterns: hybrid retrieval, source authority, graph context, calculator-first tooling, evidence-ledger answer synthesis, profile-aware MCP serving, and governance-aware operating controls.
+NX-Shield RAG is an independent design notebook for a Nutanix-focused question-answering system. It is written for engineers who understand infrastructure and APIs but may be new to AI. The implementation and recovery source are private; **this repository is documentation, not an installable application or a public source-code release**.
 
-> If you only remember one idea: **retrieval is not the product; evidence-bound, policy-aware answers are the product.**
->
-> Governance note: this repo describes a design pattern. A live deployment still needs the appropriate review and approval for its application, model/provider path, data classes, user population, and use case.
+> This is not an official Nutanix product, Nutanix Validated Design, support commitment, or compliance certification. Product names identify the technologies discussed; they do not imply endorsement. Use official product documentation for supported configurations and operational procedures.
 
-## Why this repo exists
+## RAG in one minute
 
-Most RAG examples stop at "embed documents and ask questions." That is not enough for technical support, presales, or partner-facing answers where hallucinations can cause real operational damage.
+**Retrieval-augmented generation (RAG)** means finding relevant information before asking a language model to write an answer. Think of it as an open-book examination: the assistant first selects useful reference passages, then answers from those passages.
 
-This repo documents how NX-Shield RAG is designed to answer questions with:
+For example, when someone asks, “What should I check before an infrastructure upgrade?”:
 
-- **traceable evidence** instead of ungrounded prose,
-- **multiple retrieval channels** instead of one vector lookup,
-- **source authority and access policy** instead of a flat document pile,
-- **calculator/tool-first paths** when deterministic math beats language-model guessing,
-- **graph context** as structural signal, not as a replacement for evidence,
-- **service-safe graph backend rollout** so graph migrations can be canaried without destabilizing serving,
-- **governance-aware approval boundaries** so RAG controls do not get mistaken for formal approval,
-- **weak-evidence disclosure** instead of confident answers from partial coverage,
-- **MCP service boundaries** so multiple agents can share the same RAG safely,
-- **store-parity operations** so multi-host serving is verified by logical digests and fresh canaries,
-- **rebuild discipline** so the system can be recreated from private source and public docs.
+1. The application identifies the product, version, and questions it must answer.
+2. It searches documents the user is allowed to access.
+3. It selects relevant passages, favoring authoritative and version-appropriate sources.
+4. The language model drafts an answer using those passages.
+5. The application checks the draft against the evidence and either delivers it, narrows it, or reports a gap.
 
-## Sample query path
+This is **not the same as training a model on the documents**. Updating a RAG knowledge collection usually changes the retrieval data, not the model's learned parameters. RAG can improve grounding; it does not guarantee correctness or eliminate hallucinations.
 
-Example user question:
+## The system at a glance
 
-> Can you provide a detailed comparison of VMware Cloud Foundation (VCF) 9.1 and Nutanix AOS 7.5?
-
-![NX-Shield RAG current query path with Ladybug graph context](diagrams/sample-query-path-vcf-aos.png)
-
-This is a comparison query, so the RAG path is deliberately different from a single factual lookup. The goal is not only to retrieve chunks, but to produce balanced evidence for both products and make weak coverage visible before answer generation.
-
-### 1. Classify and plan
-
-- Run a prompt-injection guard before retrieval.
-- Detect explicit comparison intent from markers such as `vs`, `versus`, `compare`, `comparison`, or `difference between`.
-- Extract search-only product/version aliases such as `VCF 9.1`, `VMware Cloud Foundation`, `Broadcom`, `AOS 7.5`, and `Nutanix AOS`.
-- Build answer obligations: compare architecture, lifecycle/upgrade model, operations, storage/virtualization assumptions, ecosystem dependencies, and caveats.
-- In the v4 path, avoid a query-time LLM planner for obvious comparison queries. Instead, use deterministic bounded routes so latency is predictable and both product sides are represented. For this sample, routes are shaped as:
-  - `VMware Cloud Foundation VCF 9.1 Broadcom`,
-  - `Nutanix AOS 7.5`,
-  - `VMware Cloud Foundation VCF 9.1 Broadcom Nutanix AOS 7.5 comparison migration competitive analysis`,
-  - the original full comparison question.
-
-### 2. Retrieve from local evidence first
-
-For comparison mode, each route can run both semantic and lexical channels. With four routes, that is up to eight LanceDB channel searches:
-
-```text
-4 routes × (vector search + full-text search) = up to 8 LanceDB searches
+```mermaid
+flowchart TD
+  D[Authorized documents] --> I[Parse, split into passages, attach source and access metadata]
+  I --> K[Searchable knowledge collection]
+  U[User question and authenticated identity] --> P[Identify the question and permitted data]
+  P --> R[Retrieve relevant permitted passages]
+  K --> R
+  R --> S[Rank evidence and identify missing support]
+  S --> L[Language model drafts an answer]
+  L --> V[Check claims against evidence]
+  V --> A[Cited answer, qualified answer, or explicit evidence gap]
 ```
 
-The implementation keeps the fan-out bounded for latency:
+This is a conceptual flow, not a deployment status report. Access checks must remain effective throughout retrieval, ranking, model calls, fallback paths, and delivery—not just at the front door.
 
-- query embeddings are batched,
-- LanceDB channels run concurrently,
-- each channel is capped before fusion,
-- scalar filters enforce access/source policy where applicable,
-- exact keyword/ripgrep search runs in parallel as a Tier 1.5 lexical safety net.
+## Why not just use a vector database?
 
-### 3. Add graph context, but do not let graph become truth
+A vector database helps find text with similar meaning. It does not, by itself, decide whether a document is authoritative, current, permitted for the user, or sufficient to support a particular claim.
 
-In parallel with query planning, Ladybug is queried for entity and relationship hints. For this sample, graph context might surface relationships among AOS, AHV, Prism, VCF, ESXi/vSphere, lifecycle tools, and storage concepts.
+This design adds:
 
-Graph matches can boost or annotate retrieved chunks, but they do not create answer claims by themselves. A graph edge is treated as structural signal; the final answer still needs source-backed evidence.
+- **Hybrid search:** combine meaning-based search with keyword and exact-identifier lookup. A similar topic is not necessarily the right KB article or product version.
+- **Source and access policy:** separate “relevant” from “allowed,” and “official” from “appropriate to this question.”
+- **An evidence ledger:** record the questions to answer, supporting passages, and missing evidence before drafting.
+- **Deterministic tools:** use calculators for arithmetic rather than asking the model to guess a result.
+- **Optional graph context:** use relationships between entities as search hints, not proof of a claim.
+- **Answer checks and safe operations:** evaluate quality, disclose limitations, and test changes before enabling them for users.
 
-### 4. Fuse with RRF, then rerank
-
-The LanceDB vector/FTS channels are fused with Reciprocal Rank Fusion (RRF):
-
-- chunk-level keys prevent duplicate chunks from crowding the candidate set,
-- route weights keep decomposed product-specific evidence above the broad original query,
-- topic/source-authority multipliers are bounded so metadata helps but does not overpower relevance,
-- source diversity is applied after semantic reranking so one document does not dominate the final answer.
-
-The top fused candidates are then expanded with nearby chunk context and sent to a cross-encoder reranker. The private implementation uses a bounded rerank pool and returns a small final set, usually the top five evidence items, to keep answer latency and context size controlled.
-
-### 5. Respect explicit source intent without weakening operational authority
-
-If the user explicitly asks for the Nutanix Bible, relevant Bible evidence is promoted so the requested source is visible. For operational procedures, current Portal and KB evidence still takes precedence; Bible material adds architecture and design depth rather than replacing current operational guidance.
-
-Exact-ID lookups bypass broad source promotion, and promotion metadata remains visible for evaluation and audit.
-
-### 6. Build the Evidence Ledger
-
-Before final writing, the system summarizes what the evidence supports and what remains weak:
-
-```yaml
-answer_obligations:
-  - compare VCF 9.1 and AOS 7.5 architecture
-  - compare operations and lifecycle management
-  - identify version-specific claims that need direct evidence
-  - separate Nutanix evidence from VMware evidence
-
-supported_claims:
-  - source-backed claims from retrieved Nutanix docs, KBs, design guides, or comparison material
-  - source-backed claims from allowed VMware/public references if local evidence is insufficient
-
-weak_or_missing_claims:
-  - any VCF 9.1-specific claim not directly supported by retrieved evidence
-  - any AOS 7.5-specific claim where the evidence is adjacent but not exact
-
-answer_rules:
-  - do not present one-sided Nutanix evidence as a complete competitive comparison
-  - mark unsupported version-specific statements as assumptions or items to verify
-  - prefer concise comparison tables only after the evidence coverage is clear
-```
-
-### 7. Use Slack or Web only as fallbacks
-
-The normal path is local evidence first. Slack and Web are waterfall fallbacks, not primary sources:
-
-- Slack search is attempted only when local RAG and exact keyword evidence are weak or missing. It is useful for field notes, but lower authority than official docs.
-- Web search is the final fallback and is constrained to allowed domains. It is useful for current public vendor pages or release notes when the local corpus lacks coverage.
-
-### Measured sample runs
-
-The table below summarizes the current Hermes v4 post-tuning sample run. It is an example execution trace, not a fixed benchmark or service-level objective.
-
-```text
-Sample suite: 5 representative Nutanix RAG queries
-Coverage: live KB retrieval, stale KB preservation, Portal refresh ranking, AHV operations, and cross-product comparison routing
-Fallbacks: local RAG path measured; Slack/Web fallback latency is not included in these local sample figures
-Accuracy result: 5/5 sample queries passed
-```
-
-| Path | Flow summary | Planning behavior | Local retrieval behavior | Measured latency |
-| --- | --- | --- | --- | ---: |
-| **Hermes v4 post-tuning path** | Guard → v4 backend → exact/official/comparison-aware retrieval channels → RRF → bounded boosts → evidence filtering. | No default query-time router LLM. Exact-KB and explicit comparison queries use deterministic routing and targeted retrieval channels. | Prioritizes official Portal refresh rows, preserves stale KB rows for auditable exact lookups, and adds comparison collateral only for explicit comparison queries. | `1.95s` average / `1.67s` median across five sample queries |
-
-Decision from this run: **keep the v4 default path deterministic and local-first.** The tuning gains came from retrieval/ranking changes — official-source routing, exact-KB promotion, stale-KB retention-time policy, and comparison-collateral routing — rather than from adding a query-time planner LLM.
-
-### Techniques used to improve accuracy and latency
-
-Accuracy controls:
-
-- deterministic comparison detection for explicit `vs` / `compare` questions,
-- comparison-specific query decomposition without a default query-time planner LLM,
-- alias expansion for acronyms and product names,
-- hybrid vector + full-text retrieval,
-- scalar access/source filters,
-- Ladybug graph hints as bounded boosts only,
-- RRF fusion across independent channels,
-- cross-encoder reranking,
-- source-authority and metadata multipliers with caps,
-- explicit-source and operational-authority precedence with provenance,
-- Evidence Ledger answer obligations and weak-evidence notes,
-- explicit fallback policy for Slack and Web.
-
-Latency controls:
-
-- bounded route count,
-- no default query-time LLM planner in the v4 comparison path,
-- route-level FTS/vector retrieval with RRF fusion,
-- capped candidate fetch and rerank pools,
-- context expansion only for fused top candidates,
-- fallback waterfall so Slack/Web are skipped when local evidence is strong.
+Each control has limits. A keyword-coverage check is not proof that a passage supports a claim; an automated verifier is not a substitute for expert review of high-impact advice.
 
 ## Start here
 
-1. [Architecture overview](docs/design/architecture.md) — the full design at human scale.
-2. [Enterprise RAG strengths](docs/design/enterprise-rag-strengths.md) — what this design adds beyond generic agentic RAG.
-3. [Retrieval pipeline](docs/design/retrieval-pipeline.md) — how a query becomes evidence.
-4. [Evidence-ledger answers](docs/design/evidence-ledger.md) — the answer-quality contract.
-5. [Metadata and corpus design](docs/design/metadata-and-corpus.md) — source authority, access policy, and lineage.
-6. [LanceDB schema](docs/design/lancedb-schema.md) — the public-safe shape of the active unified v4 corpus.
-7. [Ingestion and corpus design](docs/build/ingestion-and-corpus.md) — how content should enter the system.
-8. [AI governance alignment](docs/design/ai-governance-alignment.md) — approval boundaries, ownership, data classification, human oversight, and monitoring controls.
-9. [Rebuild from private source](docs/build/rebuild-from-private-source.md) — how to reconstruct the runtime from docs + private repo.
-10. [Operations model](docs/operate/runtime-and-mcp.md) — profile-aware MCP serving and runtime boundaries.
-11. [Evaluation strategy](docs/evaluate/evaluation-strategy.md) — canaries and regression classes.
-12. [RAG improvements release note](docs/evaluate/rag-improvements-release-note.md) — current public summary of retrieval, graph, verifier, and operations improvements.
+### Understand the basics
 
-## Repository map
+1. [RAG concepts and glossary](docs/getting-started/rag-basics.md) — embeddings, chunks, reranking, and other terms in plain language.
+2. [Architecture](docs/design/architecture.md) — component responsibilities and boundaries.
+3. [Where Nutanix Enterprise AI fits](docs/getting-started/nai-and-rag.md) — model serving versus the surrounding RAG application.
+4. [Example question and evidence obligations](examples/query-obligations.md) — what a grounded answer needs to establish.
 
-```text
-.
-├── README.md
-├── docs/
-│   ├── design/       # architecture, retrieval, metadata, LanceDB schema, evidence, graph, security
-│   ├── build/        # ingestion, rebuild, private-source mapping
-│   ├── operate/      # runtime/MCP and operational playbooks
-│   └── evaluate/     # eval strategy and milestone lineage
-├── diagrams/         # portable Mermaid diagrams
-├── templates/        # implementation-neutral templates
-└── examples/         # example query obligations and answer ledgers
-```
+### Design and build
 
-## Design principles
+- [Retrieval pipeline](docs/design/retrieval-pipeline.md) and [evidence ledger](docs/design/evidence-ledger.md).
+- [Metadata and corpus](docs/design/metadata-and-corpus.md), [schema](docs/design/lancedb-schema.md), and [ingestion](docs/build/ingestion-and-corpus.md).
+- [Graph context](docs/design/graph-context.md) and [enterprise design trade-offs](docs/design/enterprise-rag-strengths.md).
+- [Security and access](docs/design/security-and-access.md) and [governance boundaries](docs/design/ai-governance-alignment.md).
 
-- **Evidence before eloquence.** Good style is secondary to source-grounded claims.
-- **Hybrid retrieval by default.** Vector search, lexical search, exact matches, metadata filters, and graph hints solve different failure modes.
-- **Structured uncertainty.** Weak evidence should produce a review/uncertain answer, not confident filler.
-- **Production controls are part of RAG.** Authority ranking, identity filters, rollout gates, endpoint locality checks, and corpus hygiene are not optional extras; they are what make retrieval safe to operate.
-- **Deterministic tools outrank prose.** Storage sizing and arithmetic belong in calculators first, with RAG as supporting context.
-- **Access policy is retrieval logic.** Public, partner, and internal corpora cannot be separated only at the final answer stage.
-- **Approval boundary is explicit.** RAG controls support governance, but they do not replace approval for the application, providers, data classes, and use case.
-- **Human oversight stays in the loop.** External-facing or high-impact answers should remain reviewable, attributable, and stoppable by an accountable owner.
-- **Graph is advisory.** Ladybug graph signals explain relationships and can provide bounded boosts; they do not make unsupported facts true.
-- **Graph rollout is gated.** Shadow, canary, guarded-live, and rollback states are safer than an all-at-once graph cutover.
-- **Rebuildability matters.** Every major runtime concept should map to a private script/config path and an external data backup requirement.
+### Evaluate and operate
 
-## Status
+- [Evaluation strategy](docs/evaluate/evaluation-strategy.md) — test relevance, correctness, access isolation, and failure handling separately.
+- [Runtime and MCP](docs/operate/runtime-and-mcp.md) and [operations playbook](docs/operate/operations-playbook.md).
+- [Rebuild guide](docs/build/rebuild-from-private-source.md) and [private source map](docs/build/private-source-map.md) — for authorized maintainers; the public repository alone cannot rebuild the system.
+- [Design evolution](docs/evaluate/rag-improvements-release-note.md) and [milestone lineage](docs/evaluate/milestone-lineage.md) — historical context, not live readiness evidence.
 
-This repo intentionally avoids live counts, private hostnames, internal paths, tokens, and operational secrets. Treat all diagrams and paths as design-level unless the rebuild docs explicitly point to the private source bundle.
+## Reading the detailed diagrams
+
+[Portable query-flow source](diagrams/rag-system.mmd) provides a text-based architecture view. The [advanced query-path illustration](diagrams/sample-query-path-vcf-aos.png) shows additional controls and rollout options.
+
+The advanced illustration uses compact implementation terminology. Read the glossary first. Labels such as “approved,” “fail closed,” “supported claims only,” and “public-safe” describe intended controls or publication boundaries—not independently verified compliance or a guarantee that every generated answer is correct. Rollout-gated components must be validated for the actual deployment before use.
+
+## Scope and publication rules
+
+- General architecture patterns are separated from product-specific capabilities. The NAI guide cites public Nutanix sources and distinguishes documented features from proposed integration.
+- No customer data, internal enablement content, licensed analyst extracts, source-document collections, credentials, private operational reports, or live environment details belong here.
+- A right to read a document is not automatically a right to redistribute it or send it to a model provider.
+- Do not use this notebook to infer product licensing, hardware compatibility, official support, or an approved deployment. Those require the applicable authoritative sources and organizational review.
+- No live accuracy percentage, latency promise, availability target, or current rollout status is asserted here. Such claims need reproducible, revision-bound evidence from the environment in question.
+
+See [publication and contribution guidance](CONTRIBUTING.md) before proposing changes.

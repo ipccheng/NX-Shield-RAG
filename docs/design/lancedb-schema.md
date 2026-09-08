@@ -1,13 +1,19 @@
 # LanceDB Schema
 
-This page documents the public-safe shape of the active NX-Shield/Hermes Nutanix RAG LanceDB corpus. It is intentionally schema-focused: row counts, private paths, hostnames, and credential-bearing runtime details are not part of the public contract.
+> **Scope:** Independent project design guidance, not a Nutanix-approved implementation. This page does not establish deployed behavior, measured effectiveness, or vendor support. The public repository does not include a runnable service.
 
-## Active table concept
+## Reading this page
 
-The current runtime uses a unified v4 table conceptually named:
+An **embedding vector** is a numeric representation of text for similarity search. **FTS (full-text search)** searches words; **scalar indexes** accelerate metadata filters. **Lineage** records source and transformation history. The types below describe a reference data contract, not an executable migration or a guarantee about a particular LanceDB version. Validate index support and physical types against the database version you select.
+
+This page describes a reference schema for an NX-Shield-style retrieval corpus. It is intentionally schema-focused: row counts, private paths, hostnames, and credential-bearing runtime details are not part of the public contract.
+
+## Reference table concept
+
+An implementation can use a unified table with an illustrative name:
 
 ```text
-nutanix_rag_v4_unified
+rag_evidence
 ```
 
 The table combines:
@@ -21,7 +27,7 @@ The design goal is a single active retrieval contract with rollbackable lineage,
 
 ## Retrieval indexes
 
-The active schema is designed for hybrid retrieval:
+The reference schema is designed for hybrid retrieval:
 
 | Index class | Columns | Purpose |
 | --- | --- | --- |
@@ -102,8 +108,8 @@ The active schema is designed for hybrid retrieval:
 | `effective_access_class` | string | Normalized access class after policy reconciliation. |
 | `confidentiality` | string | Confidentiality class used by policy canaries. |
 | `partner_allowed` | bool | Whether partner-facing retrieval may use the row. |
-| `nx_shield_allowed` | bool | Whether the NX-Shield profile may use the row. |
-| `sam_allowed` | bool | Whether the internal/Sam profile may use the row. |
+| `public_profile_allowed` | bool | Illustrative permission flag for a public-facing profile. |
+| `internal_profile_allowed` | bool | Illustrative permission flag for an explicitly authorized internal profile. |
 | `tenant_policy_tags` | list<string> | Reserved policy tags for tenant/profile-specific filtering. |
 | `policy_conflict_flags` | list<string> | Conflicting or incomplete policy signals that require conservative handling or review. |
 
@@ -121,7 +127,7 @@ The active schema is designed for hybrid retrieval:
 | `text` | string | Display/evidence text returned to the answer path. |
 | `search_text` | string | Lexical-search optimized text. |
 | `text_markdown` | string | Markdown-preserved source text when available. |
-| `vector` | fixed_size_list<float>[1024] | Embedding vector for semantic retrieval. |
+| `vector` | fixed_size_list<float>[D] | Embedding vector for semantic retrieval; D must match the selected model and index. |
 | `token_count` | int64 | Approximate chunk token count. |
 | `char_start` | int64 | Character start offset in source unit. |
 | `char_end` | int64 | Character end offset in source unit. |
@@ -159,25 +165,22 @@ The active schema is designed for hybrid retrieval:
 | `legacy_v3_source` | string | Original v3 source identifier. |
 | `migration_source` | string | Lineage bucket such as native v4, Portal refresh, KB refresh, or transformed v3 import. |
 
-## Current lineage buckets
+## Lineage values
 
-The active design uses lineage buckets rather than hiding source generation inside opaque paths. Public-safe examples include:
+Use explicit, implementation-owned lineage values such as `native`, `legacy_import`, or `source_refresh`; combine these with source identity, parser version, and timestamps. Labels should describe origin, not claim that a private promotion phase is currently deployed. Field names containing `v3` or `v4` illustrate migration generations, not Nutanix product versions.
 
-- `v3_import` — transformed legacy rows retained with lineage.
-- `v4_native` — native v4 rows.
-- `native_v4_portal_json` — Portal JSON documentation ingestion.
-- `phase_e_portal_json_stage` — staged Portal refresh rows promoted into the unified table after canary gates.
-- `native_v4_portal_kb_refresh` — refreshed Portal support KB rows.
-- `native_v4_artifacthub_helm_refresh` — Helm/chart metadata refresh rows.
-- `native_v4_field_advisory_pdf` — field advisory PDF extraction rows.
-- `v4_native_nutanix_bible_scoped_refresh` — targeted Nutanix Bible evidence with explicit source lineage.
-- `v4_native_nutanix_bible_expanded_stage` — broader Nutanix Bible coverage promoted after retrieval, identity, and provenance gates.
+## Validation and policy invariants
 
-These names are operational lineage labels, not public API guarantees.
+- Define required fields, null behavior, timestamp format/timezone, and vocabulary values before ingestion. The table alone is not a complete validation schema.
+- Bind vector dimensions and model identity to both ingestion and queries. Matching dimensions do not make different embedding models interchangeable.
+- Preserve original identifiers alongside normalized lookup values; reject malformed explicit identifiers rather than silently correcting them.
+- Reconcile conflicting permissions conservatively across duplicate evidence identities before ranking and again before serialization. A hash is an integrity key, not proof of access rights.
+- Missing identity, source-authority, or policy fields must not default to broader access. Compatibility columns must not provide a policy bypass.
+- Keep source locations access-controlled; strip credentials and signed URL parameters from any exported citation.
 
 ## Ranking and policy notes
 
-The schema supports several current ranking behaviors:
+The schema can support these proposed ranking behaviors:
 
 - Official Portal refresh rows can receive bounded metadata boosts when the query overlaps the document/page identity.
 - Exact KB-only queries are treated as identity lookups; matching KB rows should outrank unrelated semantic neighbors.
@@ -186,7 +189,7 @@ The schema supports several current ranking behaviors:
 - Explicit Nutanix Bible requests can promote Bible evidence when it satisfies the user’s source intent.
 - Operational procedures still prefer current Portal/KB evidence over architectural background; Bible evidence adds depth without displacing current operational authority.
 - Exact-ID lanes bypass broad source-precedence promotion, and any post-ranking promotion should remain visible in provenance metadata.
-- Access policy is enforced before final evidence is handed to the profile/agent; it is not only a final-answer filter.
+- Access policy must be enforced before final evidence is handed to the profile/agent; it is not only a final-answer filter.
 
 ## Schema evolution rule
 

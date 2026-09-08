@@ -1,5 +1,11 @@
 # Example Query Obligations
 
+> **Scope:** Independent project design guidance, not a Nutanix-approved implementation. This page does not establish deployed behavior, measured effectiveness, or vendor support. The public repository does not include a runnable service.
+
+## Reading this page
+
+These are fictional question patterns, not retrieved vendor evidence, executed tests, or approved procedures. An **obligation** is a specific question the answer must address. **NIC** means network interface card; **RF** means replication factor; **FT** means fault tolerance. **AOS** refers to Nutanix storage software, and **Prism** to its management interfaces. Product/version-specific claims require authorized, current sources. Start with the [evidence-ledger design](../docs/design/evidence-ledger.md) and [fillable template](../templates/evidence-ledger-template.yaml).
+
 ## Hardware replacement / networking procedure
 
 User asks whether a NIC can be replaced and what to configure afterward.

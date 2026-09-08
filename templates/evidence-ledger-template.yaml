@@ -1,13 +1,27 @@
-query_class: <classify the user question>
-verdict: strong | review | weak | blocked
+# Illustrative authoring template, not executable configuration or vendor evidence.
+# Independent project; not a Nutanix-approved implementation.
+# Replace placeholders and validate against your own application schema before use.
+# See ../docs/design/evidence-ledger.md and ../examples/query-obligations.md.
+query_class: "<classify the user question>"
+# Select one posture: strong, review, weak, blocked. Default to weak until reviewed.
+verdict: weak
 answer_obligations:
-  - <what must be answered>
+  - "<what must be answered>"
 supported_claims:
-  - source_family: <official_docs|kb|validated_design|calculator|...>
-    source_id: <document or tool id>
-    claim: <claim directly supported by the source>
+  - source_family: "<official_docs, kb, design, calculator, or another authorized family>"
+    source_id: "<stable document or tool-result identity>"
+    source_locator: "<authorized citation URL/section or current-turn tool-result reference>"
+    source_version: "<applicable source/product version, or not applicable>"
+    evidence_scope: "<what the source supports and does not establish>"
+    claim: "<claim directly supported by the source; not a paraphrase of a guess>"
+# For tool evidence, also record inputs, units, model/formula version, and assumptions
+# in your implementation's evidence record. A calculated result is not vendor approval.
 weak_or_missing_claims:
-  - obligation: <obligation>
-    gap: <what is missing or uncertain>
+  - obligation: "<obligation>"
+    gap: "<what is missing, conflicting, stale, or uncertain>"
 answer_rules:
-  - <constraint the final answer must obey>
+  - "<constraint the final answer must obey>"
+  - "Do not disclose evidence unauthorized for the authenticated caller."
+  - "Do not describe missing evidence as proof that a feature is unsupported."
+# This conceptual posture is separate from a verifier's PASS/REWRITE/FAIL verdict.
+# Do not put private source excerpts, credentials, or restricted URLs in public examples.

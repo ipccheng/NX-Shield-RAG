@@ -1,16 +1,16 @@
+%% Conceptual design: optional components require deployment-specific validation.
 flowchart TB
-  U[User question] --> G[Agent / MCP client]
-  G --> C[Query classifier]
-  C --> Q[Query variants + obligations]
-  Q --> L[LanceDB hybrid search]
-  Q --> X[Exact lookup]
-  Q --> K[Ladybug graph context]
-  Q --> S[Calculator-first tools]
-  L --> F[RRF + dedup + diversity]
-  X --> F
-  K --> F
-  S --> F
-  F --> R[Rerank + bounded boosts]
-  R --> E[Evidence Ledger]
-  E --> A[Answer rules]
-  A --> O[Grounded answer]
+  U[User question and authenticated identity] --> C[Identify question requirements and permitted data]
+  C --> L[Hybrid search: meaning and keywords]
+  C --> X[Exact document or identifier lookup]
+  C --> S[Calculator when arithmetic is required]
+  L --> P[Reconcile permissions and source metadata]
+  X --> P
+  P --> F[Combine rankings and remove duplicates]
+  K[Optional graph relationships: hints, not proof] -.-> P
+  F --> R[Optional reranker: score relevant passages]
+  R --> E[Evidence ledger: support, sources, and gaps]
+  S --> E
+  E --> D[Language model drafts from evidence]
+  D --> V[Check claims and access before delivery]
+  V --> O[Cited answer, qualification, or evidence-gap response]
