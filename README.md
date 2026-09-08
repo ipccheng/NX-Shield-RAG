@@ -58,8 +58,7 @@ Each control has limits. A keyword-coverage check is not proof that a passage su
 
 1. [RAG concepts and glossary](docs/getting-started/rag-basics.md) — embeddings, chunks, reranking, and other terms in plain language.
 2. [Architecture](docs/design/architecture.md) — component responsibilities and boundaries.
-3. [Where Nutanix Enterprise AI fits](docs/getting-started/nai-and-rag.md) — model serving versus the surrounding RAG application.
-4. [Example question and evidence obligations](examples/query-obligations.md) — what a grounded answer needs to establish.
+3. [Example question and evidence obligations](examples/query-obligations.md) — what a grounded answer needs to establish.
 
 ### Design and build
 
@@ -83,7 +82,7 @@ The advanced illustration uses compact implementation terminology. Read the glos
 
 ## Scope and publication rules
 
-- General architecture patterns are separated from product-specific capabilities. The NAI guide cites public Nutanix sources and distinguishes documented features from proposed integration.
+- This repository explains our RAG architecture and engineering: ingestion, retrieval, evidence controls, evaluation, and operations. Nutanix solution technical information belongs in the RAG knowledge collection, not in this public repository. Do not publish product feature guides, solution deployment details, or solution-specific integration designs here.
 - No customer data, internal enablement content, licensed analyst extracts, source-document collections, credentials, private operational reports, or live environment details belong here.
 - A right to read a document is not automatically a right to redistribute it or send it to a model provider.
 - Do not use this notebook to infer product licensing, hardware compatibility, official support, or an approved deployment. Those require the applicable authoritative sources and organizational review.

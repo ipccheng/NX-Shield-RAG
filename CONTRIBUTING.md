@@ -12,7 +12,9 @@ This repository shares independent engineering patterns. It is not an official N
 
 ## Public-content boundaries
 
-Publish original explanations and links to authoritative, publicly accessible sources. Do not copy private source code, customer details, credentials, internal enablement material, restricted Portal/KB bodies, licensed research, private reports, live host identifiers, or deployment-specific paths into this repository.
+Keep this repository focused on our RAG system: its architecture, retrieval methods, evidence controls, evaluation, and operating patterns. Nutanix solution technical information belongs in the RAG knowledge collection, not here. Do not add product feature guides, solution deployment details, or solution-specific integration designs, even when the underlying sources are public.
+
+Publish original explanations and references relevant to RAG engineering. Do not copy private source code, customer details, credentials, internal enablement material, restricted Portal/KB bodies, licensed research, private reports, live host identifiers, or deployment-specific paths into this repository.
 
 Document access, processing permission, and republication permission are different. When rights are unclear, leave the material out pending a rights review. Public availability alone is not a license to republish a whole work.
 
@@ -31,7 +33,7 @@ Before publication:
 
 - Review every changed document and any linked diagrams; image text and metadata can leak information too.
 - Check relative links, code fences, diagram syntax, terminology, and consistency with the repository's stated scope.
-- Cite product-specific claims next to the statements they support; retain release/version and Tech Preview caveats.
+- Exclude Nutanix solution details; keep examples focused on how retrieval and evidence checks work, not on product answers or deployment instructions. Cite externally sourced RAG-engineering claims where appropriate.
 - Scan for credentials, personal data, private paths/hosts/identifiers, restricted source content, and approval-implying wording.
 - Remove unsupported live metrics rather than presenting an old sample as a current benchmark.
 - Check the diff for accidental inclusion of runtime data, audit output, or private source files.
