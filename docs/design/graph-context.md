@@ -44,6 +44,14 @@ Do not use graph relationships as final-answer evidence by themselves. A relatio
 - Detect when retrieval is source-thin around a required entity.
 - Identify graph-neighbor candidates for shadow evaluation.
 
+## Identity-admitted, read-only projection
+
+Treat graph context as an optional read-only projection of evidence, not an independent authority. Admit the authenticated identity before querying or exposing labels. Each returned relationship must retain complete evidence labels: source identity and locator, applicable version, relationship scope, and the passage context needed to preserve conditions and exceptions. If a label cannot be safely grounded and bounded, omit it rather than clipping away its qualification.
+
+Resolve origins against the current query-scoped canonical evidence view, reconcile restrictive duplicates, and apply caller and model-processing policy. A stale, missing, superseded, or out-of-scope origin cannot authorize a graph hint. Do not expose restricted titles or source existence through a graph explanation. Recheck origins before evidence serialization.
+
+Use only a small bounded ranking boost for admitted hints; protect exact-identifier results and source authority. Entity co-occurrence and graph distance are not semantic proof or support for a composed claim. Graph failure may use an explicitly qualified graph-disabled retrieval path, but identity/policy errors must not become a permissive fallback.
+
 ## Graph-shadow rollout
 
 Graph-assisted retrieval should be promoted in phases:
@@ -71,6 +79,8 @@ Graph libraries and vector-store runtimes do not always coexist safely inside on
 - make graph candidate ordering deterministic before comparing top-k results,
 - preserve a rollback path to the previous graph backend or to graph-disabled retrieval,
 - check read-only behavior against the selected backend/version contract; require sidecar absence only when that contract requires it, and never delete recovery or lock files merely to satisfy a canary.
+
+For an SDK-only deployment, use a host-native virtual environment for the graph adapter and qualify its interpreter and native dependencies independently. Do not infer that container tooling or a graph server is required. Keep Kuzu, where retained, as a read-only rollback/archive backend only—not an active query helper or automatic fallback. Explicit rollback must pass its own schema, identity, and top-level entry-point checks.
 
 This pattern lets a team evaluate a new graph backend without treating the migration as a data-store cutover. The backend can be active as a candidate source while ranking remains canary or guarded-live.
 

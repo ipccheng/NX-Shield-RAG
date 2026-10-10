@@ -28,6 +28,7 @@ Deeper references:
 
 - [Metadata and corpus design](design/metadata-and-corpus.md) — source authority, versions, and lineage.
 - [LanceDB reference schema](design/lancedb-schema.md) — illustrative fields and validation invariants, not an executable migration.
+- [Evidence-safe query performance](design/query-performance.md) — bounded embedding reuse, canonical policy order, equivalent fast paths, and query snapshots.
 - [Graph context with Ladybug](design/graph-context.md) — optional relationship hints and separately gated rollout.
 - [Enterprise RAG design controls](design/enterprise-rag-strengths.md) — why these evidence and operating controls matter.
 
@@ -58,6 +59,9 @@ No executable benchmark harness or public evaluation dataset is supplied. Deploy
 - [Recovery prerequisites and model](operate/recovery-model.md) — what an authorized owner needs to restore and test a deployment; not a public installer.
 
 ## Diagram and contribution resources
+
+- [Documentation validation](evaluate/documentation-validation.md) — executable handbook checks and their limits.
+- [Security reporting](../SECURITY.md) — report publication exposures without disclosing sensitive content.
 
 - [Diagram assets and renderer](../diagrams/README.md) — PNG, SVG, simplified Mermaid source, and reproducible rendering instructions.
 - [Publication and contribution guidance](../CONTRIBUTING.md) — keep this repository focused on RAG engineering and exclude solution details and restricted material.

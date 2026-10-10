@@ -29,6 +29,10 @@ Do not imply:
 
 Use product names only to identify the relevant technologies. Nutanix and other product names are trademarks of their respective owners. Do not add corporate logos or copied vendor diagrams without appropriate permission.
 
+## Run the documentation checks
+
+Follow [documentation validation](docs/evaluate/documentation-validation.md) before submitting changes. The checks cover local links/assets, fenced blocks, Python/YAML/SVG syntax, Mermaid parsing, and selected publication hazards. Passing them is not a rights, security, or factual-accuracy certification. Every new handbook page must appear in the documentation index and link back to it.
+
 ## Review checklist
 
 Before publication:
