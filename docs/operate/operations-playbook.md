@@ -72,7 +72,7 @@ A safe multi-host promotion has four explicit phases:
 
 1. **Prepare** — verified backups, immutable candidate identities, rollback scripts, and no active writers.
 2. **Validate** — new-content identity retrieval, preservation canaries, access-policy checks, ranking tests, graph parity, and index completeness.
-3. **Cut over** — stop only scoped services, replace active vector/graph state, and restart through the normal service manager.
+3. **Cut over** — stop only scoped services; verify service-manager unload and owned-worker closure, not merely a closed port. Replace the bound vector/graph state and restart through the normal service manager.
 4. **Prove or roll back** — fresh-process direct queries, MCP transport checks, profile/identity canaries, and automatic rollback on any required failure.
 
 Do not describe a successful candidate build as a production promotion. Likewise, a completed but rejected background build remains archival evidence and must not be mistaken for the active candidate.

@@ -36,6 +36,7 @@ Finding similar text is only one part of answering a technical question. This de
 - **Source and access policy:** distinguish relevant evidence from evidence the caller is allowed to use.
 - **An evidence ledger:** record supporting sources, assumptions, and unanswered points before drafting.
 - **Deterministic tools:** compute arithmetic with explicit inputs rather than asking a model to guess.
+- **Evidence-safe performance:** reuse validated embeddings without caching permissions; bind each query to a consistent snapshot. See [query performance](docs/design/query-performance.md).
 - **Optional graph hints:** use relationships to assist search, not to establish facts.
 - **Answer checks:** compare the draft with its evidence, then deliver, qualify, revise, or withhold it.
 
@@ -46,6 +47,8 @@ These are controls to implement and evaluate—not guarantees of correctness. A 
 ```text
 README.md                 Visual overview and starting points
 CONTRIBUTING.md           Public scope and contribution rules
+SECURITY.md               Safe publication-issue reporting
+tools/                    Documentation validation (not a RAG runtime)
 docs/README.md            Complete handbook and reading order
 docs/getting-started/     RAG concepts and glossary
 docs/design/              Architecture, retrieval, evidence, metadata, security

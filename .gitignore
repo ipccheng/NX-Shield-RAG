@@ -1,6 +1,7 @@
 # This public repo is documentation only.
 .DS_Store
 __pycache__/
+.venv-docs/
 *.pyc
 .env
 .env.*

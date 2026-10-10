@@ -105,6 +105,10 @@ A useful pipeline should not just concatenate results. NX-Shield uses these idea
 - **Operational-authority precedence** so current Portal and KB evidence leads operational procedures while architectural background remains available for depth.
 - **Weak-evidence detection** so one-sided or low-authority evidence triggers caution.
 
+### Canonical policy before selection
+
+Reconcile all policy-bearing duplicates for a canonical identity before source-family filtering, title preselection, ranking, or deduplication can hide a restrictive copy. Apply this to every hybrid route and fallback, then recheck anything appended before serialization. Metadata preselection may use only fields unchanged by reconciliation. Preserve malformed-policy error behavior for keyed merges and keyless copies. See [evidence-safe query performance](query-performance.md) for cache, matching, snapshot, and timing contracts.
+
 ### Precedence guardrails
 
 Source precedence is applied only after independent retrieval channels have produced a fused candidate set. Exact-ID requests bypass broad source promotion, and each promotion should carry provenance metadata so evaluation can explain why ordering changed. Current and retained historical editions remain separately identifiable unless exact supersession has been proven.

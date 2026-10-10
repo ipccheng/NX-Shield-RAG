@@ -61,6 +61,16 @@ An implementation can separate responsibilities as follows; this is not a deploy
 
 Public docs intentionally omit local ports, hostnames, LaunchAgent labels, and private filesystem paths. Those belong in the private source-recovery repo and operational backups.
 
+## SDK-only deployment boundary
+
+An SDK-only implementation can use a host-native graph virtual environment, with explicit interpreter and dependency bindings. Validate imports through the actual service adapter; a foreground shell import does not prove the managed service uses the same environment. No container or graph-server installation is implied. Treat any retained Kuzu store as rollback/archive only, not an active helper; a rollback selection must not silently fall forward to the current backend.
+
+## Staged endpoint qualification
+
+Qualify native/direct calls, private-facing transport, and public-facing transport separately for every configured endpoint. Bind each result to its actual service identity, policy, snapshot, and loaded code. Include positive retrieval, unknown identity, conflicting duplicates, restricted-origin graph hints, malformed embeddings, and graph-disabled behavior. A native pass does not prove either transport path, and a private endpoint pass does not qualify a public endpoint.
+
+Stage report-only comparison, restricted canary exposure, then explicit promotion. On shutdown, wait for the service manager to confirm the exact owned service is unloaded and its workers are gone; port closure alone is insufficient because an auto-restart can reopen stores. Do not unload unrelated services. Require fresh-process canaries after restart and test rollback through the same endpoint path.
+
 ## Store parity and sync checks
 
 For multi-host RAG serving, "the code is deployed" is not enough. Treat vector store, graph store, source documents, service config, and profile policy as separate parity layers.

@@ -255,4 +255,8 @@ Before running a comparison, freeze the test queries, relevance labels, baseline
 
 Report sample size and per-class failures alongside aggregate metrics. Define Hit@k (queries with a relevant result), Recall@k (relevant items retrieved), and MRR (mean reciprocal rank of the first relevant item) before comparing runs. Record whether latency covers retrieval only or the entire answer, including retries and external calls. Include unauthorized duplicates, missing metadata, rollback paths, and prompt-injection cases, not only ordinary successful questions.
 
-No executable harness or public benchmark dataset is shipped here. Implementers must supply and run their own authorized tests; these checklists are not test results.
+No executable RAG benchmark harness or public benchmark dataset is shipped here. The separate [documentation validator](documentation-validation.md) checks repository integrity, not retrieval quality.
+
+Use the [query-performance qualification matrix](../design/query-performance.md) for canonical duplicates, cache response validation, Unicode equivalence, snapshot mutation, and identity-scoped graph cases. Run each required native/private/public endpoint independently; do not aggregate away a failing identity.
+
+Implementers must supply and run their own authorized tests; these checklists are not test results.
