@@ -11,3 +11,4 @@ auth.json
 logs/
 sessions/
 data/
+_site/

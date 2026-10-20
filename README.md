@@ -2,6 +2,8 @@
 
 **Find relevant evidence. Check the answer. Make uncertainty visible.**
 
+[Read the documentation website](https://ipccheng.github.io/NX-Shield-RAG/) — a sidebar-free reading experience.
+
 This is the public engineering handbook for our retrieval-augmented generation (RAG) system. It explains how retrieval, source permissions, evidence checks, and operations fit together—for technical readers who may be new to AI.
 
 The RAG application implementation and recovery source are private. This repository contains **documentation, examples, and diagram-rendering tools—not an installable RAG service**. It is an independent project, not an official Nutanix product or validated design.
