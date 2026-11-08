@@ -2,7 +2,7 @@
 
 [Documentation index](../README.md) · [Project home](../../README.md)
 
-> **Scope:** Independent project design guidance, not a Nutanix-approved implementation. This page does not establish deployed behavior, measured effectiveness, or vendor support. The public repository does not include a runnable service.
+> **Scope:** Independent project design guidance, not a Nutanix-approved implementation. The explicitly labeled scoped observation below is not a general deployment, effectiveness, or vendor-support claim. The public repository does not include a runnable service.
 
 ## Reading this page
 
@@ -10,7 +10,20 @@
 
 This playbook is intentionally public-safe and implementation-neutral.
 
+## Scoped deployment observation
+
+**2026-11-08:** [paired-runtime alignment](runtime-and-mcp.md#paired-runtime-alignment) and the [state-preserving zero-query continuation](recovery-model.md#state-preserving-zero-query-continuation) completed within their reviewed scope.
+
+- Independent readback found the application, broker, and supervisor online; the startup job was loaded and idle after a successful startup child, with the same owner. No reboot was tested, and a point-in-time observation does not establish sustained availability.
+- Resource limits were unchanged and all observed samples passed the bounded acceptance checks. These observations are not capacity or performance benchmarks.
+- The scheduled backup chain and discovery checks passed. No new backup was launched; this was not a new archive or restore test.
+- Shared engine and gateway services were not restarted. Serving dependencies and their admitted lifetimes were preserved rather than rolled back.
+
+These are scoped operational results, not evidence of a generally supported install, completed source publication, improved ranking, or whole-corpus accessibility. Private operational evidence is intentionally not included in this handbook.
+
 ## Before changing runtime behavior
+
+For an ordinary planned change, use the sequence below. A separately authorized zero-query continuation must instead respect its saved-evidence and no-restart boundaries; these general canary steps do not grant additional queries.
 
 1. Identify which service owns the behavior: agent gateway, RAG MCP, storage calculator, data store, or profile prompt.
 2. Take a backup of the relevant config/script.
@@ -56,7 +69,7 @@ Symptom: one profile retrieves newer documents or graph context while another do
 
 Likely cause: vector store, graph store, or source artifacts were updated on one host but not synced to the other.
 
-Fix: run a report-first parity check using stable row counts, schema hashes, chunk/document digests, graph node/edge counts, and fresh MCP canaries. Sync only after a destination backup and restart only the scoped RAG services that hold the stores open.
+Fix: first separate unintended drift from intentional access-policy and graph differences. Run report-first comparison over the authorized destination subset using stable row counts, schema hashes, chunk/document digests, graph node/edge counts, and authorized fresh MCP canaries. Sync only after a destination backup and restart only the scoped RAG services that hold the stores open. Do not force whole-corpus equality across different rights boundaries.
 
 ### Candidate passes locally but promotion is unsafe
 
@@ -64,7 +77,7 @@ Symptom: new documents retrieve correctly in a local candidate, but rebuilding i
 
 Likely cause: approximate-index reconstruction changed ordering, the candidate was built from a different baseline, or source/vector/graph artifacts were not bound to one promotion transaction.
 
-Fix: reject or archive the candidate rather than weakening preservation gates. Rebuild from the same frozen baseline using an incremental/index-preserving strategy, require logical parity on every serving host, and bind promotion plus rollback to exact candidate identities before service quiescence.
+Fix: reject or archive the candidate rather than weakening preservation gates. Rebuild from the same frozen baseline using an incremental/index-preserving strategy, require logical parity for each host's authorized comparison set while preserving intentional policy and graph exceptions, and bind promotion plus rollback to exact candidate identities before service quiescence.
 
 ## Corpus promotion transaction
 

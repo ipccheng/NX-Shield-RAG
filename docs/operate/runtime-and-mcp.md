@@ -2,7 +2,7 @@
 
 [Documentation index](../README.md) · [Project home](../../README.md)
 
-> **Scope:** Independent project design guidance, not a Nutanix-approved implementation. This page does not establish deployed behavior, measured effectiveness, or vendor support. The public repository does not include a runnable service.
+> **Scope:** Independent project design guidance, not a Nutanix-approved implementation. The explicitly labeled scoped observation below is not a general deployment, effectiveness, or vendor-support claim. The public repository does not include a runnable service.
 
 ## Reading this page
 
@@ -44,6 +44,18 @@ This allows independent restart, logging, policy, and rollback.
 
 Each service must declare the same serving identity in its environment, process arguments, and policy configuration. A partner/public-facing service must never inherit an internal identity through a copied LaunchAgent or default argument. Startup validation and canaries should fail closed on an identity mismatch or missing identity.
 
+## Paired-runtime alignment
+
+**Scoped deployment observation — 2026-11-08:** the paired serving runtimes were aligned to one common reviewed implementation, with explicit host and identity overrides. Shared code does not imply shared permissions or identical content on both hosts. Allowed content synchronization preserved intentional private, public, and partner access differences and graph exceptions; it was not wholesale corpus replication.
+
+Reusable checks are to bind loaded source and dependencies separately from host configuration, authenticate each serving identity, and compare only the content and graph relationships authorized for the selected destination. Keep intentional exceptions explicit rather than making every store match. Neither code alignment nor scoped content checks prove that every eligible document is discoverable or that ranking has improved; a complete-retrieval extension was not deployed or validated by this update.
+
+### Logical and canonical runtime membership
+
+A dependency manifest can name code through logical paths while the native runtime inventory sees canonical filesystem paths. It can also include configuration and qualification evidence that are not executable modules. Treat these as distinct authenticated sets, not interchangeable file lists.
+
+The scoped recovery corrected that membership projection while authenticating non-code dependencies and exact directory-link targets separately. The strict generic reader and native code inventory checks remained unchanged. Validation reached the actual runtime-role projection, native rebinding to the selected runtime, and downstream writer admission—not only manifest comparison. Preserve rejection of unknown files, unexpected links, changed targets, and mismatched content rather than weakening the generic checks to admit a relocated runtime.
+
 ## Reference service shape
 
 An implementation can separate responsibilities as follows; this is not a deployment inventory:
@@ -74,6 +86,8 @@ Stage report-only comparison, restricted canary exposure, then explicit promotio
 ## Store parity and sync checks
 
 For multi-host RAG serving, "the code is deployed" is not enough. Treat vector store, graph store, source documents, service config, and profile policy as separate parity layers.
+
+Define the authorized comparison set first. Intentional access-policy and graph differences are not drift; do not copy restricted content to achieve whole-store equality. The workflow below is for an authorized store replacement, not the separate [zero-query continuation](recovery-model.md#state-preserving-zero-query-continuation), which preserves already-published serving dependencies.
 
 A safe store-sync workflow should:
 

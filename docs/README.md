@@ -2,7 +2,9 @@
 
 [Project home and diagram](../README.md) · [Publication rules](../CONTRIBUTING.md)
 
-A reading path for infrastructure engineers who are new to AI, with deeper references for implementers and operators. These are RAG engineering patterns, not Nutanix solution guides or proof of a deployed system. The public repository does not include the RAG application implementation.
+A reading path for infrastructure engineers who are new to AI, with deeper references for implementers and operators. These are RAG engineering patterns, not Nutanix solution guides or general deployment guarantees; scoped operational observations are labeled separately. The public repository does not include the RAG application implementation.
+
+**Scoped update — 2026-11-08:** [Paired-runtime alignment](operate/runtime-and-mcp.md#paired-runtime-alignment) and [state-preserving zero-query recovery](operate/recovery-model.md#state-preserving-zero-query-continuation) report a completed, bounded deployment separately from the general design guidance. See [observed operational limits](operate/operations-playbook.md#scoped-deployment-observation) for what was—and was not—checked. This is not a whole-corpus retrieval qualification or a source-publication receipt.
 
 ## 1. Understand
 

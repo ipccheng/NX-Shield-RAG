@@ -21,7 +21,24 @@ The public documents describe retrieval, ingestion, metadata, evidence-ledger an
 
 Back up optional application state only when it is required for recovery or approved audit purposes. Do not restore conversation history into a public/demo service by default.
 
+## State-preserving zero-query continuation
+
+**Scoped deployment observation — 2026-11-08:** a separately authorized application-only continuation completed after serving dependencies had already been published. It retained those dependencies, the exact unchanged serving-service lifetimes, and original authentic saved responses. Production activation, commit, and startup were independently read back. This was not a rollback, history restore, or permission to issue fresh retrieval queries.
+
+The reusable pattern applies only when its evidence and authority are explicit:
+
+1. Preserve the failed attempt and any partially installed state. An attempt is single-use; do not rewrite its outcome or replay it under the same authority.
+2. Authenticate original saved responses against the exact source, identity, dependency state, and unchanged service lifetimes they qualify. Reusing evidence does not establish new retrieval coverage; changed or unknown bindings require a separate qualification decision, not an invented success or an unbudgeted query.
+3. Keep recovery direction separate from dependency selection. Restoring the application can retain already-published serving dependencies rather than silently selecting an older dependency set.
+4. Validate the actual [runtime-membership projection](runtime-and-mcp.md#logical-and-canonical-runtime-membership), native rebind, and writer admission. Authenticate non-code inputs and directory-link targets separately without weakening strict readers or the code inventory.
+5. Admit installed-but-unloaded startup artifacts only by their exact pre-change contents and observed load state. Copy and preserve the prior artifacts before replacement, retain required filesystem metadata, and reject unexpected changes; unloaded does not mean absent or safe to overwrite.
+6. Independently read back activation, commit, startup registration, and ownership. Preserve historical failures alongside the new result; do not restore history or erase consumed attempts to make the sequence appear uninterrupted.
+
+This path has **no fresh-query budget**. It does not replace fresh canaries for a different deployment or authorize skipping their required gates. The completed observation did not test reboot recovery, sustained availability, or complete retrieval across the whole corpus. See the [operational observation](operations-playbook.md#scoped-deployment-observation) for the remaining bounds.
+
 ## High-level recovery sequence
+
+The following is general guidance for a separately authorized restore with its own query and rollback budget, not the zero-query continuation above.
 
 1. Select a tested source revision and compatible application, database, graph-driver, and model dependencies.
 2. Provision an isolated environment with external serving disabled.
