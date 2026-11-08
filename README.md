@@ -30,6 +30,12 @@ Follow the handbook in this order, or jump to your area:
 
 **[Browse the complete documentation index →](docs/README.md)**
 
+## Scoped deployment update — 2026-11-08
+
+Paired serving runtimes now use one reviewed implementation with explicit host and identity overrides. A separately authorized, state-preserving recovery completed without new retrieval queries, retaining the already-published serving dependencies and authentic saved responses. See [runtime alignment](docs/operate/runtime-and-mcp.md#paired-runtime-alignment) and [zero-query recovery](docs/operate/recovery-model.md#state-preserving-zero-query-continuation).
+
+This reports a bounded deployment observation, not a supported installation, sustained-availability guarantee, or completed source-publication claim. It does **not** deploy or validate complete retrieval across the whole corpus, guarantee discovery of every eligible document, or establish improved ranking. The public repository remains a design and operations handbook, not runnable application source.
+
 ## Why more than vector search?
 
 Finding similar text is only one part of answering a technical question. This design also considers:
