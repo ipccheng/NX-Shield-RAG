@@ -36,6 +36,12 @@ Paired serving runtimes now use one reviewed implementation with explicit host a
 
 This reports a bounded deployment observation, not a supported installation, sustained-availability guarantee, or completed source-publication claim. It does **not** deploy or validate complete retrieval across the whole corpus, guarantee discovery of every eligible document, or establish improved ranking. The public repository remains a design and operations handbook, not runnable application source.
 
+## Incremental ingestion architecture
+
+The updated [ingestion model](docs/build/ingestion-and-corpus.md#incremental-update-contract) separates source-format adapters, resumable content deltas, incremental index maintenance, and protected publication. Graph enrichment and destination promotion have their own approval and validation boundaries.
+
+Reuse of the downstream core does **not** mean every document format is qualified. See [capability boundaries](docs/build/ingestion-and-corpus.md#capability-and-qualification-boundaries) and the [control-plane architecture](docs/design/architecture.md#ingestion-and-publication-control-plane). This is an architecture update, not a new deployment or performance claim.
+
 ## Why more than vector search?
 
 Finding similar text is only one part of answering a technical question. This design also considers:

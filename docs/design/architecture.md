@@ -119,6 +119,21 @@ For sizing and arithmetic, deterministic calculators should run before prose gen
 
 The ledger is the handoff between retrieval and answer generation. It should make unsupported claims obvious before the model writes a confident answer.
 
+## Ingestion and publication control plane
+
+Content preparation is separate from the live query path:
+
+1. **Format adapter:** turn an authorized source into traceable units without losing headings, code, qualifiers, or page boundaries.
+2. **Manifest and delta planner:** bind source identity, revision, extraction/chunking configuration, embedding compatibility, and intended audience. Reconcile unchanged, new, and changed units against a pinned baseline.
+3. **Resumable candidate writer:** journal work and acquire embeddings only where required. Preserve unrelated rows and vectors; do not treat a changed access policy as permission to reuse old publication approval.
+4. **Index maintenance:** extend the named vector, full-text, and scalar indexes. Keep rebuilding or retraining an explicit maintenance operation, not a hidden ingestion step.
+5. **Publication controller:** validate the candidate, bind recovery artifacts, switch only the authorized serving selectors, and verify fresh service-path retrieval and denied identities. Restore and verify the baseline if a required check fails.
+6. **Independent graph and destination lanes:** source-grounded relationship enrichment and approved-subset promotion require their own evidence. A private corpus update does not imply graph coverage or distribution to another audience.
+
+The serving layer consumes an accepted snapshot; it should not discover partially ingested rows. Query-scoped views must be rebound and qualified when their baseline changes. File copies, compatible embeddings, and matching row counts alone do not establish source permissions or complete coverage.
+
+This is the intended separation of responsibilities. Source-format qualification and deployed coverage must be declared per release; see [the ingestion contract](../build/ingestion-and-corpus.md#incremental-update-contract).
+
 ## Data/control separation
 
 - **Public design docs** live here.

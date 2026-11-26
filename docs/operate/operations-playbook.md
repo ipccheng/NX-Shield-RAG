@@ -134,6 +134,17 @@ Active data-store coverage should follow the current architecture. A RAG recover
 
 Retention is a separate safety decision. Measure per-run growth and restore confidence before enabling deletion; a successful backup job is not by itself approval to prune old recovery points.
 
+## Incremental ingestion acceptance and recovery
+
+Before a batch, identify the qualified source adapter and its supported input shape. Use the [incremental update contract](../build/ingestion-and-corpus.md#incremental-update-contract), not a legacy rebuild script chosen only because it accepts the file extension.
+
+- Freeze exact-title, source-qualified, generic relevance, baseline-preservation, and denied-identity tests as distinct obligations. A source-qualified success does not repair or erase a generic relevance failure.
+- Verify the actual evidence-card identity, text, and citation shape produced by the serving formatter; do not validate against a guessed schema.
+- Preserve failed publication receipts. A corrected successor requires fresh bindings and acceptance; previously validated embeddings can be reused only when their source and compatibility bindings remain unchanged.
+- After rollback, verify baseline selectors and real retrieval. After success, verify the selected candidate through a fresh service client; reconnect an expired transport without treating a direct-backend result as service-path proof.
+- Check backup discovery against the newly selected stores. A rollback copy does not establish scheduled-backup coverage or restore readiness.
+- Report graph enrichment, destination synchronization, and channel-specific end-to-end checks separately. Do not imply they occurred merely because the primary ingestion passed.
+
 ## Canary categories
 
 - exact identifier query,
